@@ -50,6 +50,18 @@ ekspoziciju za svaki snimak, pa dva kadra iste mirne sobe umeju da budu
 različito svetla. `Pokret.razlikaBezSjaja` svakoj sličici oduzme njenu srednju
 svetlinu pre poređenja; bez toga mirna noć izgleda nemirno.
 
+**Izmereno na Samsung S23, sve četiri kamere:** ekspozicija do 1/6 s, ISO do
+3200, i nijedna ne nudi noćni režim, ni platformskim putem ni preko CameraX-a.
+Samsungova Kamera pritom ide do 30 sekundi. Granica je njihova odluka za tuđe
+aplikacije, ne granica senzora; potvrđeno i tuđim nalazima (Open Camera na
+Galaxy uređajima dobija bokeh, ne i noćni režim). Zato postoje dva zaobilazna
+puta: traženje preko prijavljene granice i slaganje kadrova.
+
+**Traženje preko prijavljene granice je dozvoljeno, ali nije zajamčeno.**
+Camera2 izričito dozvoljava da se traži vrednost izvan raspona; ponašanje je
+nedefinisano. Zato se to nikad ne radi prećutno nego iza prekidača, a
+`CaptureResult` posle kaže da li je prošlo.
+
 **Kamere se razlikuju, i izbor mora da postoji.** Izmereno na Samsung S23:
 kamera 0 daje najviše 1/6 s i ne prijavljuje nijedan noćni režim, nego samo
 automatski, lice i bokeh. Zbog toga postoji izbor tačne kamere po oznaci, a ne
@@ -77,6 +89,11 @@ mekano primiču belom: tvrdo sečenje na 255 spljoštilo bi svaku lampicu u ravn
 belu mrlju. Ispod kolena je zbir netaknut, jer je tamo skoro cela noćna slika.
 Zaokružuje se, ne odseca, inače ni potpuno prezaren piksel ne bi bio čisto beo.
 Slaže se na 1600px duže strane, jer sabirač za 12 MP ne bi stao u memoriju.
+
+**Pojačanje se računa nad zbirom, ne nad gotovom slikom, i ne gleda najsvetliji
+piksel.** Posle stezanja se ne bi videlo koliko je slika zapravo bila tamna, a
+jedan svetleći indikator na punjaču odredio bi pojačanje za celu sobu i sve
+ostalo bi ostalo crno. Zato histogram nad zbirom i prag na 99,5 odsto.
 
 **Tražena ekspozicija nije dobijena ekspozicija.** Granica se razlikuje od
 modela do modela; sve iznad nje telefon tiho stegne na svoju vrednost, bez

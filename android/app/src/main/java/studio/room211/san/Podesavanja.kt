@@ -352,9 +352,25 @@ class Podesavanja : AppCompatActivity() {
             isoPolje?.setText(cfg.iso.toString())
         })
 
+        sadrzaj.addView(switch(this, "Traži i preko granice telefona", cfg.prekoGranice) {
+            cfg.prekoGranice = it
+        })
+        sadrzaj.addView(body(this, "Camera2 dozvoljava da se traži ekspozicija izvan prijavljenog " +
+                "raspona: radi na nekim uređajima, ali se ne garantuje. Vredi probati baš na " +
+                "Samsungu, jer njihova Kamera ide do 30 sekundi dok Camera2 prijavljuje 1/6, što " +
+                "znači da je granica njihova odluka a ne granica senzora. Noćna proba pod " +
+                "„Dobijeno“ kaže da li je prošlo."))
+
         sadrzaj.addView(field(this, "Kadrova za slaganje", cfg.kadrovaZaSlaganje.toString()) { uneto ->
             uneto.toIntOrNull()?.let { cfg.kadrovaZaSlaganje = it }
         }.first)
+        sadrzaj.addView(switch(this, "Pojačaj sliku posle slaganja", cfg.autoPojacanje) {
+            cfg.autoPojacanje = it
+        })
+        sadrzaj.addView(body(this, "Osam kadrova mraka i dalje ume da bude mrak. Zato se posle " +
+                "sabiranja gleda gde je najsvetliji deo slike i podiže se do vrha. Najsvetlijih " +
+                "pola procenta se zanemari, da jedan indikator na punjaču ne odredi osvetljenost " +
+                "cele sobe."))
         sadrzaj.addView(field(this, "Rastojanje do kreveta, u metrima", cfg.rastojanjeM.toString()) { uneto ->
             uneto.toFloatOrNull()?.let { cfg.rastojanjeM = it }
         }.first)

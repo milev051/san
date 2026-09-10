@@ -94,6 +94,24 @@ class Config(context: Context) {
     val slaganje: Boolean
         get() = rezim == "slaganje"
 
+    /**
+     * Trazi ekspoziciju i preko granice koju telefon prijavljuje.
+     *
+     * Camera2 dozvoljava da se trazi vrednost izvan prijavljenog raspona:
+     * radi, ali se ne garantuje. Vredi probati bas na Samsungu, jer njihova
+     * Kamera ide do 30 sekundi dok Camera2 prijavljuje 1/6, sto znaci da je
+     * granica njihova odluka a ne granica senzora. `CaptureResult` posle kaze
+     * da li je proslo.
+     */
+    var prekoGranice: Boolean
+        get() = prefs.getBoolean("preko_granice", false)
+        set(v) = prefs.edit().putBoolean("preko_granice", v).apply()
+
+    /** Posle slaganja pojacaj sliku dok najsvetliji deo ne dodje do vrha. */
+    var autoPojacanje: Boolean
+        get() = prefs.getBoolean("auto_pojacanje", true)
+        set(v) = prefs.edit().putBoolean("auto_pojacanje", v).apply()
+
     /** Vreme ekspozicije u nanosekundama. Granicu odredjuje telefon, ne mi. */
     var ekspozicijaNs: Long
         get() = prefs.getLong("eksp_ns", 125_000_000L)   // 1/8 s

@@ -26,7 +26,39 @@ object Slaganje {
     /** Duza strana na kojoj se slaze. Sabirac za 12 MP ne bi stao u memoriju. */
     const val STRANA = 1600
 
-    fun spoji(kadrovi: List<ByteArray>, kvalitet: Int): ByteArray? {
+    /** Koliko od najsvetlijih piksela sme da se preseče kad se racuna pojacanje. */
+    private const val VRH_UDEO = 0.005
+
+    /** Do koje vrednosti se dize najsvetliji deo slike. */
+    private const val CILJ = 235
+
+    /**
+     * Koliko puta pojacati sliku posle sabiranja.
+     *
+     * Osam kadrova mraka i dalje ume da bude mrak: sabiranje pomnozi i signal i
+     * ono malo svetla sto ga ima, ali ako je scena bila na tri odsto opsega,
+     * osam puta tri je dvadeset cetiri. Zato se posle sabiranja gleda gde je
+     * najsvetliji deo slike i podize se do vrha.
+     *
+     * Ne gleda se najsvetliji piksel nego vrednost ispod koje je 99.5 odsto
+     * slike: jedan svetleci indikator na punjacu inace odredi pojacanje za celu
+     * sobu, i sve ostalo ostane crno.
+     */
+    fun faktorPojacanja(histogram: IntArray, ukupnoPiksela: Int, cilj: Int = CILJ): Double {
+        if (ukupnoPiksela <= 0) return 1.0
+        val dozvoljenoPreko = (ukupnoPiksela * VRH_UDEO).toInt()
+        var iznad = 0
+        for (nivo in histogram.indices.reversed()) {
+            iznad += histogram[nivo]
+            if (iznad > dozvoljenoPreko) {
+                if (nivo <= 0) return 1.0
+                return (cilj.toDouble() / nivo).coerceIn(1.0, 16.0)
+            }
+        }
+        return 1.0
+    }
+
+    fun spoji(kadrovi: List<ByteArray>, kvalitet: Int, pojacaj: Boolean = true): ByteArray? {
         if (kadrovi.isEmpty()) return null
         if (kadrovi.size == 1) return kadrovi[0]
 
@@ -68,11 +100,23 @@ object Slaganje {
 
         if (zbirR == null || spojenih == 0) return null
 
+        var faktor = 1.0
+        if (pojacaj) {
+            // Histogram se pravi nad zbirom, ne nad gotovom slikom: posle
+            // stezanja se ne bi videlo koliko je slika zapravo bila tamna.
+            val histogram = IntArray(256)
+            for (i in zbirR!!.indices) {
+                val svetlina = (zbirR!![i] + zbirG!![i] + zbirB!![i]) / 3
+                histogram[svetlina.coerceIn(0, 255)]++
+            }
+            faktor = faktorPojacanja(histogram, zbirR!!.size)
+        }
+
         val izlaz = IntArray(sirina * visina)
         for (i in izlaz.indices) {
-            val r = stegni(zbirR!![i])
-            val g = stegni(zbirG!![i])
-            val b = stegni(zbirB!![i])
+            val r = stegni((zbirR!![i] * faktor).toInt())
+            val g = stegni((zbirG!![i] * faktor).toInt())
+            val b = stegni((zbirB!![i] * faktor).toInt())
             izlaz[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
 

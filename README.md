@@ -94,6 +94,15 @@ najviše **1/6 s** i nema nijedan noćni režim, pa vredi probati ostale.
 | **Ručno** | upisano vreme i ISO | kad kamera daje dovoljno dugu ekspoziciju |
 | **Slaganje** | snimi više kadrova zaredom i sabere ih u jedan | kad ništa od gornjeg ne daje svetlu sliku |
 
+**Noćni režim na Samsungu, izmereno na S23:** nijedna od četiri kamere ga ne
+nudi, ni platformskim putem ni preko CameraX-a. Sve četiri prijavljuju
+ekspoziciju do 1/6 s, dok Samsungova Kamera ide do 30 sekundi. Granica je,
+dakle, njihova odluka za tuđe aplikacije, ne granica senzora. Open Camera je na
+Galaxy uređajima došao do istog: dobija bokeh, ne i noćni režim.
+
+Zato postoje dva zaobilazna puta, oba u aplikaciji: **Traži i preko granice
+telefona** i režim **Slaganje**.
+
 **Noćni režim se traži na dva načina**, jer to nije isti spisak. Prvo preko
 platformskog Camera2 Extensions API-ja, pa preko CameraX proširenja, koja
 razgovaraju sa proizvođačevom bibliotekom direktno i ponekad vide ono što
@@ -121,6 +130,16 @@ osam bita. Razlika u finoći je odatle, ne iz broja kadrova.
 Uz ručne vrednosti postoji dugme **Postavi na granicu telefona**, koje upiše
 najdužu ekspoziciju i najveći ISO koje ta kamera stvarno daje. Bez njega se
 granica traži pogađanjem, jer telefon sve preko nje tiho stegne i ne kaže ništa.
+
+**Traži i preko granice telefona** je prekidač vredan probe. Camera2 dozvoljava
+da se traži vrednost izvan prijavljenog raspona: radi na nekim uređajima, a ne
+garantuje se. Noćna proba pod „Dobijeno" kaže da li je prošlo. Ako prođe, dobio
+si pravu dugu ekspoziciju i slaganje ti više ne treba.
+
+**Pojačaj sliku posle slaganja** rešava ono što sabiranje samo ne može: osam
+kadrova mraka i dalje ume da bude mrak. Posle sabiranja se gleda gde je
+najsvetliji deo slike i podiže se do vrha, uz zanemarivanje najsvetlijih pola
+procenta, da jedan indikator na punjaču ne odredi osvetljenost cele sobe.
 
 **Zbog svega ovoga merenje pokreta ne broji promenu svetline:** svakoj sličici
 se pre poređenja oduzme njena srednja svetlina, pa noć u kojoj telefon menja

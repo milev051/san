@@ -239,7 +239,7 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
                 val jedan = obicanSnimak(id, karakteristike)
                 if (jedan.bajtovi != null) kadrovi.add(jedan.bajtovi) else greska = jedan.greska
             }
-            val spojeno = Slaganje.spoji(kadrovi, cfg.kvalitet)
+            val spojeno = Slaganje.spoji(kadrovi, cfg.kvalitet, cfg.autoPojacanje)
             if (spojeno != null) {
                 return Rezultat(
                     spojeno,
@@ -425,7 +425,12 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         if (trazenaEkspozicija > 0 && rucnoMoguce) {
             val raspon = c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
             val isoRaspon = c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
-            val vreme = raspon?.clamp(trazenaEkspozicija) ?: trazenaEkspozicija
+            // Trazena vrednost izvan prijavljenog raspona je dozvoljena: radi
+            // na nekim uredjajima, a `CaptureResult` posle kaze da li je
+            // stvarno prosla. Na Samsungu vredi probati, jer njihova Kamera ide
+            // do 30 sekundi dok Camera2 prijavljuje 1/6.
+            val vreme = if (cfg.prekoGranice) trazenaEkspozicija
+            else raspon?.clamp(trazenaEkspozicija) ?: trazenaEkspozicija
             val osetljivost = isoRaspon?.clamp(trazeniIso) ?: trazeniIso
 
             // Scene rezim i HDR umeju da nadglasaju rucne vrednosti: telefon

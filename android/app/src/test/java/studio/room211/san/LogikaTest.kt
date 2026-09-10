@@ -211,6 +211,44 @@ class LogikaTest {
     }
 
     @Test
+    fun `tamna slika se pojacava dok vrh ne dodje do cilja`() {
+        // Cela slika na nivou 20 od 255: pojacanje je oko dvanaest puta.
+        val histogram = IntArray(256).also { it[20] = 10_000 }
+        assertEquals(235.0 / 20, Slaganje.faktorPojacanja(histogram, 10_000), 0.01)
+    }
+
+    @Test
+    fun `vec svetla slika se ne dira`() {
+        val histogram = IntArray(256).also { it[250] = 10_000 }
+        assertEquals(1.0, Slaganje.faktorPojacanja(histogram, 10_000), 0.001)
+    }
+
+    @Test
+    fun `jedna sijalica ne odredjuje osvetljenost cele sobe`() {
+        // Pola procenta piksela je uzareno, ostatak je mrak. Bez zanemarivanja
+        // vrha bi pojacanje bilo 1 i soba bi ostala crna.
+        val histogram = IntArray(256).also {
+            it[255] = 40          // 0.4 odsto od 10 000
+            it[15] = 9_960
+        }
+        val faktor = Slaganje.faktorPojacanja(histogram, 10_000)
+        assertTrue("pojacanje je ostalo na $faktor", faktor > 10.0)
+    }
+
+    @Test
+    fun `pojacanje ima gornju granicu`() {
+        // Potpuni mrak se ne sme pomnoziti sa 235, jer bi ostao samo sum.
+        val histogram = IntArray(256).also { it[1] = 10_000 }
+        assertTrue(Slaganje.faktorPojacanja(histogram, 10_000) <= 16.0)
+    }
+
+    @Test
+    fun `prazna slika ne rusi racun`() {
+        assertEquals(1.0, Slaganje.faktorPojacanja(IntArray(256), 0), 0.001)
+        assertEquals(1.0, Slaganje.faktorPojacanja(IntArray(256), 100), 0.001)
+    }
+
+    @Test
     fun `izbor uzima prvi kadar, promene i sidra`() {
         val razlike = listOf(0.0, 0.001, 0.002, 0.20, 0.001, 0.001)
         val izabrani = Pokret.izbor(razlike, prag = 0.045, sidroNa = 12)
