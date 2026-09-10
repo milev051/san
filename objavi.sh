@@ -87,8 +87,12 @@ fi
 DEX=$(mktemp -d)
 trap 'rm -rf "$DEX"' EXIT
 unzip -qo "$APK" 'classes*.dex' -d "$DEX"
+# Stringovi se prvo ispisu u fajl, pa se pretrazuje fajl. `strings | grep -q`
+# ovde ne valja: grep izadje na prvom pogotku, strings dobije SIGPIPE, a
+# `pipefail` to prijavi kao pad, pa skripta odbije ispravan APK.
+strings -a "$DEX"/classes*.dex > "$DEX/stringovi.txt" 2>/dev/null || true
 for K in MainActivity Snimanje; do
-  strings -a "$DEX"/classes*.dex | grep -q "studio/room211/san/$K" \
+  grep -qF "studio/room211/san/$K" "$DEX/stringovi.txt" \
     || { crveno "R8 je pojeo $K. Proveri proguard-rules.pro"; exit 1; }
 done
 zeleno "  $APK ($(du -h "$APK" | cut -f1)), verzija i komponente potvrdjene u APK-u"
@@ -112,9 +116,9 @@ if [ -n "$IZVOR" ]; then
   echo "$IZVOR" | sed 's/^/  /'
   exit 1
 fi
-NALAZI=$(strings -a "$DEX"/classes*.dex 2>/dev/null | grep -oE \
+NALAZI=$(grep -oE \
   'AIza[0-9A-Za-z_-]{30,40}|gsk_[A-Za-z0-9]{40,}|sk-ant-[A-Za-z0-9_-]{30,}|sk-[A-Za-z0-9_-]{30,}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}' \
-  | sort -u || true)
+  "$DEX/stringovi.txt" | sort -u || true)
 if [ -n "$NALAZI" ]; then
   crveno "APK sadrzi nesto sto lici na API kljuc:"
   echo "$NALAZI" | sed 's/^/  /'
