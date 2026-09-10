@@ -1,0 +1,264 @@
+package studio.room211.san
+
+import android.content.Context
+import android.graphics.ImageFormat
+import android.graphics.SurfaceTexture
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.params.StreamConfigurationMap
+import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
+import android.util.Range
+import android.util.Size
+import android.view.Surface
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+/**
+ * Jedan snimak: otvori kameru, snimi, zatvori.
+ *
+ * Kamera se NE drzi otvorena celu noc. Otvorena greje telefon i trosi bateriju
+ * osam sati zbog posla koji traje sekundu, a sa zakljucanom ekspozicijom nema
+ * ni sta da se smiruje izmedju dva kadra.
+ *
+ * `snimi()` blokira nit sa koje je pozvan i ne sme se zvati sa glavne.
+ */
+class Kamera(private val ctx: Context, private val cfg: Config) {
+
+    data class Sposobnosti(
+        val id: String,
+        val nivo: String,
+        val rucnaMoguca: Boolean,
+        val ekspozicija: Range<Long>?,
+        val iso: Range<Int>?,
+        val najblizeM: Float,
+        val velicine: List<Size>,
+    ) {
+        fun opis(): String {
+            val e = ekspozicija
+            val raspon = if (e == null) "nepoznato" else
+                "${vremeTekst(e.lower)} do ${vremeTekst(e.upper)}"
+            val najveca = velicine.firstOrNull()
+            return buildString {
+                append("Kamera $id, nivo $nivo\n")
+                append("Ekspozicija: $raspon\n")
+                append("ISO: ${iso?.lower ?: "?"} do ${iso?.upper ?: "?"}\n")
+                append("Najveca slika: ${najveca?.width ?: 0}x${najveca?.height ?: 0}\n")
+                append(if (rucnaMoguca) "Rucna ekspozicija: podrzana" else
+                    "Rucna ekspozicija: NIJE podrzana, radi se automatika")
+            }
+        }
+
+        companion object {
+            fun vremeTekst(ns: Long): String {
+                val s = ns / 1_000_000_000.0
+                return if (s >= 1) "%.1fs".format(s) else "1/${(1 / s).toInt()}s"
+            }
+        }
+    }
+
+    private val manager = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+
+    fun idKamere(): String? {
+        val trazeno = if (cfg.prednjaKamera) CameraCharacteristics.LENS_FACING_FRONT
+        else CameraCharacteristics.LENS_FACING_BACK
+        return manager.cameraIdList.firstOrNull {
+            manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == trazeno
+        } ?: manager.cameraIdList.firstOrNull()
+    }
+
+    fun sposobnosti(): Sposobnosti? {
+        val id = idKamere() ?: return null
+        val c = manager.getCameraCharacteristics(id)
+        val nivo = when (c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)) {
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> "LEGACY"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED -> "LIMITED"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL -> "FULL"
+            CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3 -> "LEVEL_3"
+            else -> "EXTERNAL"
+        }
+        val mogucnosti = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
+        val mapa = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        return Sposobnosti(
+            id = id,
+            nivo = nivo,
+            rucnaMoguca = mogucnosti.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
+            ),
+            ekspozicija = c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE),
+            iso = c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE),
+            najblizeM = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f,
+            velicine = velicine(mapa),
+        )
+    }
+
+    private fun velicine(mapa: StreamConfigurationMap?): List<Size> =
+        mapa?.getOutputSizes(ImageFormat.JPEG)?.sortedByDescending { it.width.toLong() * it.height }
+            ?: emptyList()
+
+    /** Najveca velicina koja staje u izabranu granicu. */
+    private fun izabranaVelicina(sve: List<Size>): Size? {
+        if (sve.isEmpty()) return null
+        val granica = when (cfg.rezolucija) {
+            "2mp" -> 2_500_000L
+            "8mp" -> 8_500_000L
+            else -> Long.MAX_VALUE
+        }
+        return sve.firstOrNull { it.width.toLong() * it.height <= granica } ?: sve.last()
+    }
+
+    class Rezultat(val bajtovi: ByteArray?, val greska: String)
+
+    fun snimi(): Rezultat {
+        val id = idKamere() ?: return Rezultat(null, "nema kamere")
+        val karakteristike = manager.getCameraCharacteristics(id)
+        val velicina = izabranaVelicina(velicine(karakteristike.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)))
+            ?: return Rezultat(null, "kamera ne nudi JPEG")
+
+        val nit = HandlerThread("kamera").apply { start() }
+        val ruka = Handler(nit.looper)
+        val citac = ImageReader.newInstance(velicina.width, velicina.height, ImageFormat.JPEG, 2)
+
+        // Lazna povrsina za zagrevanje. Bez nje jedan jedini snimak stize pre
+        // nego sto se automatika smiri, pa je kadar ili crn ili prosvetljen.
+        val tekstura = SurfaceTexture(0).apply { setDefaultBufferSize(640, 480) }
+        val laznaPovrsina = Surface(tekstura)
+
+        var bajtovi: ByteArray? = null
+        var greska = ""
+        val gotovo = CountDownLatch(1)
+
+        citac.setOnImageAvailableListener({ c ->
+            try {
+                c.acquireNextImage()?.use { slika ->
+                    val bafer = slika.planes[0].buffer
+                    bajtovi = ByteArray(bafer.remaining()).also { bafer.get(it) }
+                }
+            } catch (e: Exception) {
+                greska = "citanje: ${e.message}"
+            }
+            gotovo.countDown()
+        }, ruka)
+
+        var uredjaj: CameraDevice? = null
+        try {
+            val otvoren = CountDownLatch(1)
+            manager.openCamera(id, object : CameraDevice.StateCallback() {
+                override fun onOpened(kamera: CameraDevice) {
+                    uredjaj = kamera; otvoren.countDown()
+                }
+
+                override fun onDisconnected(kamera: CameraDevice) {
+                    greska = "kameru je preuzela druga aplikacija"
+                    kamera.close(); otvoren.countDown(); gotovo.countDown()
+                }
+
+                override fun onError(kamera: CameraDevice, kod: Int) {
+                    greska = "kamera, greska $kod"
+                    kamera.close(); otvoren.countDown(); gotovo.countDown()
+                }
+            }, ruka)
+
+            if (!otvoren.await(6, TimeUnit.SECONDS) || uredjaj == null) {
+                return Rezultat(null, greska.ifBlank { "kamera se ne otvara" })
+            }
+
+            val kamera = uredjaj!!
+            val sesija = CountDownLatch(1)
+            var sesijaRef: CameraCaptureSession? = null
+
+            @Suppress("DEPRECATION")
+            kamera.createCaptureSession(
+                listOf(laznaPovrsina, citac.surface),
+                object : CameraCaptureSession.StateCallback() {
+                    override fun onConfigured(s: CameraCaptureSession) {
+                        sesijaRef = s; sesija.countDown()
+                    }
+
+                    override fun onConfigureFailed(s: CameraCaptureSession) {
+                        greska = "sesija nije prihvacena"; sesija.countDown()
+                    }
+                },
+                ruka,
+            )
+
+            if (!sesija.await(6, TimeUnit.SECONDS) || sesijaRef == null) {
+                return Rezultat(null, greska.ifBlank { "sesija se ne otvara" })
+            }
+            val s = sesijaRef!!
+
+            val zagrevanje = kamera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                .apply { addTarget(laznaPovrsina); podesi(this, karakteristike) }
+            s.setRepeatingRequest(zagrevanje.build(), null, ruka)
+            // Automatika trazi vise kadrova da se smiri; zakljucane vrednosti
+            // ne traze nista osim da senzor krene.
+            Thread.sleep(if (cfg.rucnaEkspozicija) 350 else 1200)
+            s.stopRepeating()
+
+            val snimak = kamera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
+                addTarget(citac.surface)
+                podesi(this, karakteristike)
+                set(CaptureRequest.JPEG_QUALITY, cfg.kvalitet.toByte())
+                set(CaptureRequest.JPEG_ORIENTATION,
+                    (karakteristike.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90))
+            }
+            s.capture(snimak.build(), null, ruka)
+
+            if (!gotovo.await(15, TimeUnit.SECONDS)) greska = "snimak nije stigao"
+            s.close()
+        } catch (e: SecurityException) {
+            greska = "nema dozvole za kameru"
+        } catch (e: Exception) {
+            greska = e.message ?: e.javaClass.simpleName
+        } finally {
+            try { uredjaj?.close() } catch (e: Exception) {}
+            try { citac.close() } catch (e: Exception) {}
+            laznaPovrsina.release()
+            tekstura.release()
+            nit.quitSafely()
+        }
+
+        return Rezultat(bajtovi, if (bajtovi == null && greska.isBlank()) "prazan snimak" else greska)
+    }
+
+    /**
+     * Zakljucavanje ekspozicije i fokusa.
+     *
+     * Kad telefon ne podrzava rucni senzor, ostaje automatika: bolje losije
+     * uporediva slika nego nijedna. Fokus se zakljucava i u automatskom rezimu,
+     * jer autofokus u mraku lovi i vrati mutan kadar bez ijedne greske.
+     */
+    private fun podesi(zahtev: CaptureRequest.Builder, c: CameraCharacteristics) {
+        val mogucnosti = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
+        val rucnoMoguce = mogucnosti.contains(
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
+        )
+
+        if (cfg.rucnaEkspozicija && rucnoMoguce) {
+            val raspon = c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+            val isoRaspon = c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+            val vreme = raspon?.clamp(cfg.ekspozicijaNs) ?: cfg.ekspozicijaNs
+            val osetljivost = isoRaspon?.clamp(cfg.iso) ?: cfg.iso
+            zahtev.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+            zahtev.set(CaptureRequest.SENSOR_EXPOSURE_TIME, vreme)
+            zahtev.set(CaptureRequest.SENSOR_SENSITIVITY, osetljivost)
+            zahtev.set(CaptureRequest.SENSOR_FRAME_DURATION, vreme)
+        } else {
+            zahtev.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+        }
+
+        val najblize = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+        if (najblize > 0f) {
+            zahtev.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
+            zahtev.set(CaptureRequest.LENS_FOCUS_DISTANCE, (1f / cfg.rastojanjeM).coerceIn(0f, najblize))
+        }
+        zahtev.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO)
+        zahtev.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,
+            CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO)
+    }
+}

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Servis mora da bude tipa `camera` i da ima ovu dozvolu, inace Android 14
+         odbija da ga upali. Uz to sme da se pokrene SAMO dok je aplikacija na
+         ekranu, zbog cega snimanje pocinje dugmetom a ne rasporedom. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <!-- Bez wake lock-a telefon uspava procesor izmedju dva okidanja i posao
+         zakasni po nekoliko minuta, tiho. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Tacan alarm je ovde sustina, ne udobnost: poravnanje na pun minut je
+         ceo smisao. USE_EXACT_ALARM se dobija pri instalaciji, SCHEDULE_EXACT_ALARM
+         se na Androidu 12 i 13 trazi od korisnika. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Do Androida 9 se u DCIM pise direktno, pa je dozvola potrebna; od 10
+         upis ide preko MediaStore-a i dozvola vise ne postoji. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/ic_menu_camera"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.San">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".Snimanje"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+    </application>
+</manifest>

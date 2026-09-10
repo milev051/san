@@ -1,0 +1,36 @@
+# --- slike, po nastavku a ne po folderu ---------------------------------------
+# Ignorisan folder stiti samo dok neko ne ostavi sliku van njega, a cena greske
+# je tvoja nocna fotografija u repozitorijumu, zauvek, i posle brisanja iz
+# istorije. Zato po nastavku, gde god se nalazili.
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.dng
+*.mp4
+*.mov
+*.gif
+*.webp
+
+# Izuzetak: zapisnici i tabele SE cuvaju, oni su ceo smisao poredjenja.
+!analiza/etalon/*.csv
+!analiza/zadaci/**/*.csv
+
+analiza/slike/
+noci/
+
+# --- Android ------------------------------------------------------------------
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+*.apk
+*.aab
+
+# --- macOS i Python -----------------------------------------------------------
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
