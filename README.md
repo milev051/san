@@ -17,6 +17,13 @@ Puna zamisao, sa razlozima i odbačenim rešenjima, stoji u
 
 ## Instalacija
 
+Najlakše preko GitHub-a, bez kabla. Na telefonu otvori
+<https://github.com/milev051/san/releases/latest> i skini `San-<verzija>.apk`.
+Repozitorijum je privatan, pa moraš biti prijavljen na GitHub u tom pregledaču.
+Android će pitati da dozvoli instalaciju iz tog pregledača; to je jednokratno.
+
+Ako imaš kabl pri ruci:
+
 ```bash
 cd android
 ./build.sh install     # traži uključen USB debugging
@@ -92,6 +99,22 @@ u EXIF-u.
 
 Na jedan minut je 480 slika i oko 1,9 GB po noći. Na pet minuta je 96 slika i
 oko 380 MB.
+
+---
+
+## Objava nove verzije
+
+```bash
+# podigni versionName i versionCode u android/app/build.gradle.kts
+./objavi.sh                    # opis se sklopi sam
+./objavi.sh beleske.md         # ili opis iz fajla
+```
+
+Skripta odbija da objavi ako radno stablo nije čisto, ako je u repozitorijumu
+završilo nešto nalik slici, ako testovi padaju, ako je ta verzija već
+objavljena, ako `versionName` u gotovom APK-u nije onaj koji se objavljuje, ako
+je R8 pojeo komponentu iz manifesta, ili ako u izvoru ili APK-u nađe nešto
+nalik API ključu.
 
 ---
 
