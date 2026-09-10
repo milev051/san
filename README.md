@@ -198,7 +198,7 @@ u EXIF-u.
 | Rezolucija | puna | ekran odmah kaže koliko je to slika i gigabajta po noći |
 | Kamera | zadnja | veći senzor, a ekran gleda od kreveta |
 | Kamera | auto | tačna kamera po oznaci; razlikuju se u ekspoziciji i noćnom režimu |
-| Režim | Automatika | Noćni, Auto, Ručno ili **Slaganje** |
+| Režim | Automatika | Noćni, Auto, Ručno ili **Slaganje**. Ispod izbora se vidi samo ono što taj režim koristi |
 | Kadrova za slaganje | 8 | osam kadrova od 1/6 s je kao jedan od 1,3 s |
 | Zaključaj ekspoziciju posle prve slike | uključeno | važi za Automatiku: prva slika određuje vrednosti za celu noć |
 | Prekini kad baterija padne na | 5% | ugašen telefon ne završi zapisnik |

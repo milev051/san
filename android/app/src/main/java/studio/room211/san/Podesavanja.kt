@@ -53,6 +53,7 @@ class Podesavanja : AppCompatActivity() {
     private lateinit var kameraOpis: TextView
     private var ekspozicijaPolje: com.google.android.material.textfield.TextInputEditText? = null
     private var isoPolje: com.google.android.material.textfield.TextInputEditText? = null
+    private var prednjaPrekidac: android.view.View? = null
     private val posao = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -219,8 +220,17 @@ class Podesavanja : AppCompatActivity() {
         ) { izbor ->
             cfg.kameraId = izbor
             kameraOpis.text = opisKamera(sve)
+            prednjaPrekidac?.visibility =
+                if (izbor.isBlank()) android.view.View.VISIBLE else android.view.View.GONE
             osveziRezim()
         })
+
+        // Ima smisla samo dok je izbor na „auto"; sa izabranom oznakom se
+        // strana ionako zna.
+        prednjaPrekidac = switch(this, "Kad je auto, uzmi prednju kameru", cfg.prednjaKamera) {
+            cfg.prednjaKamera = it
+        }
+        sadrzaj.addView(prednjaPrekidac!!)
 
         kameraOpis = body(this, opisKamera(sve))
         sadrzaj.addView(kameraOpis)
@@ -296,24 +306,25 @@ class Podesavanja : AppCompatActivity() {
 
     // ----------------------------------------------------------------- slika
 
+    /**
+     * Podešavanja koja važe samo za pojedini režim.
+     *
+     * Ekran je narastao na desetak polja od kojih većina u datom trenutku ne
+     * radi ništa: ISO ne postoji u noćnom režimu, broj kadrova ne postoji nigde
+     * osim u slaganju. Sve odjednom znači da se traži ono što je važno među
+     * onim što nije, i da se podesi nešto što se neće ni pogledati.
+     *
+     * Zato se ispod izbora režima prikazuje samo ono što taj režim koristi.
+     */
+    private val zaAuto = ArrayList<android.view.View>()
+    private val zaRucno = ArrayList<android.view.View>()
+    private val zaSlaganje = ArrayList<android.view.View>()
+
     private fun karticaSlika(): ViewGroup {
         val (kartica, sadrzaj) = card(this, "Slika")
-        sadrzaj.addView(choice(
-            this,
-            listOf("puna" to "Puna", "8mp" to "8 MP", "2mp" to "2 MP"),
-            cfg.rezolucija,
-        ) { cfg.rezolucija = it; brojSlikaOpis.text = opisRazmaka() })
 
-        sadrzaj.addView(switch(this, "Prednja kamera", cfg.prednjaKamera) {
-            cfg.prednjaKamera = it
-        })
-        sadrzaj.addView(switch(this, "Upiši vreme i na arhivsku sliku", cfg.zigNaArhivi) {
-            cfg.zigNaArhivi = it
-        })
-        sadrzaj.addView(body(this, "Na kopiji koja ide modelu vreme se upisuje uvek, jer je " +
-                "tamo jedino sidro za redosled."))
-
-        sadrzaj.addView(body(this, "Kako se snima. Tri odvojena puta, ne prekidači koji se sabiraju."))
+        // Režim je prvo, jer sve ispod njega zavisi od njega.
+        sadrzaj.addView(body(this, "Kako se snima. Četiri odvojena puta, ne prekidači koji se sabiraju."))
         sadrzaj.addView(choice(
             this,
             listOf("noc" to "Noćni", "auto" to "Auto", "rucno" to "Ručno", "slaganje" to "Slaganje"),
@@ -323,26 +334,31 @@ class Podesavanja : AppCompatActivity() {
         rezimOpis = body(this, "")
         sadrzaj.addView(rezimOpis)
 
-        sadrzaj.addView(switch(this, "Zaključaj ekspoziciju posle prve slike",
+        // ---- samo za Auto
+        u(sadrzaj, zaAuto, switch(this, "Zaključaj ekspoziciju posle prve slike",
             cfg.zakljucajPosleParve) { cfg.zakljucajPosleParve = it })
-        sadrzaj.addView(body(this, "Važi za Automatiku. Prva slika se snimi automatikom, iz nje se " +
-                "pročita koju je ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide " +
-                "tim vrednostima, pa su sve slike uporedive."))
+        u(sadrzaj, zaAuto, body(this, "Prva slika se snimi automatikom, iz nje se pročita koju je " +
+                "ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide tim vrednostima, " +
+                "pa su sve slike uporedive."))
+
+        // ---- za Ručno i za Slaganje
+        val rucne = ArrayList<android.view.View>()
 
         val eksp = field(this, "Ekspozicija, 1/x sekunde", ekspozicijaTekst()) { uneto ->
             uneto.toIntOrNull()?.let { if (it > 0) cfg.ekspozicijaNs = 1_000_000_000L / it }
         }
         ekspozicijaPolje = eksp.second
-        sadrzaj.addView(eksp.first)
+        rucne.add(eksp.first)
+
         val isoP = field(this, "ISO", cfg.iso.toString()) { uneto ->
             uneto.toIntOrNull()?.let { cfg.iso = it }
         }
         isoPolje = isoP.second
-        sadrzaj.addView(isoP.first)
+        rucne.add(isoP.first)
 
         // Bez ovoga se granica telefona traži pogađanjem: sve preko nje daje
         // istu sliku, jer je telefon tiho stegne i ne kaže ništa.
-        sadrzaj.addView(button(this, "Postavi na granicu telefona") {
+        rucne.add(button(this, "Postavi na granicu telefona") {
             val kamera = Kamera(this, cfg)
             val najduza = kamera.najduzaEkspozicija()
             val najveci = kamera.najveciIso()
@@ -351,32 +367,65 @@ class Podesavanja : AppCompatActivity() {
             ekspozicijaPolje?.setText(ekspozicijaTekst())
             isoPolje?.setText(cfg.iso.toString())
         })
-
-        sadrzaj.addView(switch(this, "Traži i preko granice telefona", cfg.prekoGranice) {
+        rucne.add(switch(this, "Traži i preko granice telefona", cfg.prekoGranice) {
             cfg.prekoGranice = it
         })
-        sadrzaj.addView(body(this, "Camera2 dozvoljava da se traži ekspozicija izvan prijavljenog " +
+        rucne.add(body(this, "Camera2 dozvoljava da se traži ekspozicija izvan prijavljenog " +
                 "raspona: radi na nekim uređajima, ali se ne garantuje. Vredi probati baš na " +
                 "Samsungu, jer njihova Kamera ide do 30 sekundi dok Camera2 prijavljuje 1/6, što " +
                 "znači da je granica njihova odluka a ne granica senzora. Noćna proba pod " +
                 "„Dobijeno“ kaže da li je prošlo."))
 
-        sadrzaj.addView(field(this, "Kadrova za slaganje", cfg.kadrovaZaSlaganje.toString()) { uneto ->
-            uneto.toIntOrNull()?.let { cfg.kadrovaZaSlaganje = it }
+        for (v in rucne) {
+            sadrzaj.addView(v)
+            zaRucno.add(v)
+            zaSlaganje.add(v)
+        }
+
+        // ---- samo za Slaganje
+        u(sadrzaj, zaSlaganje, field(this, "Kadrova za slaganje",
+            cfg.kadrovaZaSlaganje.toString()) { uneto ->
+            uneto.toIntOrNull()?.let { cfg.kadrovaZaSlaganje = it; osveziRezim() }
         }.first)
-        sadrzaj.addView(switch(this, "Pojačaj sliku posle slaganja", cfg.autoPojacanje) {
+        u(sadrzaj, zaSlaganje, switch(this, "Pojačaj sliku posle slaganja", cfg.autoPojacanje) {
             cfg.autoPojacanje = it
         })
-        sadrzaj.addView(body(this, "Osam kadrova mraka i dalje ume da bude mrak. Zato se posle " +
-                "sabiranja gleda gde je najsvetliji deo slike i podiže se do vrha. Najsvetlijih " +
-                "pola procenta se zanemari, da jedan indikator na punjaču ne odredi osvetljenost " +
-                "cele sobe."))
-        sadrzaj.addView(field(this, "Rastojanje do kreveta, u metrima", cfg.rastojanjeM.toString()) { uneto ->
+        u(sadrzaj, zaSlaganje, body(this, "Osam kadrova mraka i dalje ume da bude mrak. Zato se " +
+                "posle sabiranja gleda gde je najsvetliji deo slike i podiže se do vrha. " +
+                "Najsvetlijih pola procenta se zanemari, da jedan indikator na punjaču ne odredi " +
+                "osvetljenost cele sobe."))
+
+        // ---- važi za sve režime
+        sadrzaj.addView(field(this, "Rastojanje do kreveta, u metrima",
+            cfg.rastojanjeM.toString()) { uneto ->
             uneto.toFloatOrNull()?.let { cfg.rastojanjeM = it }
         }.first)
         sadrzaj.addView(body(this, "Fokus se zaključava na to rastojanje. U mraku autofokus lovi " +
                 "i vraća mutan kadar, bez ijedne greške."))
+
+        sadrzaj.addView(choice(
+            this,
+            listOf("puna" to "Puna", "8mp" to "8 MP", "2mp" to "2 MP"),
+            cfg.rezolucija,
+        ) { cfg.rezolucija = it; brojSlikaOpis.text = opisRazmaka() })
+        sadrzaj.addView(switch(this, "Upiši vreme i na arhivsku sliku", cfg.zigNaArhivi) {
+            cfg.zigNaArhivi = it
+        })
+        sadrzaj.addView(body(this, "Na kopiji koja ide modelu vreme se upisuje uvek, jer je " +
+                "tamo jedino sidro za redosled."))
         return kartica
+    }
+
+    /** Dodaj u karticu i upamti kom režimu pripada. */
+    private fun u(gde: ViewGroup, grupa: MutableList<android.view.View>, sta: android.view.View) {
+        gde.addView(sta)
+        grupa.add(sta)
+    }
+
+    private fun prikazi(grupa: List<android.view.View>, vidi: Boolean) {
+        for (v in grupa) {
+            v.visibility = if (vidi) android.view.View.VISIBLE else android.view.View.GONE
+        }
     }
 
     /**
@@ -384,6 +433,14 @@ class Podesavanja : AppCompatActivity() {
      * da li ga ovaj telefon uopšte ima.
      */
     private fun osveziRezim() {
+        prikazi(zaAuto, cfg.rezim == "auto")
+        // Ručne vrednosti služe i slaganju: tamo određuju jedan kadar od
+        // onoliko koliko ih se sabira.
+        prikazi(zaRucno, cfg.rezim == "rucno" || cfg.rezim == "slaganje")
+        prikazi(zaSlaganje, cfg.rezim == "slaganje")
+        prednjaPrekidac?.visibility =
+            if (cfg.kameraId.isBlank()) android.view.View.VISIBLE else android.view.View.GONE
+
         val kamera = Kamera(this, cfg)
         val ima = try { kamera.nocniDostupan() } catch (e: Exception) { false }
         rezimOpis.text = when (cfg.rezim) {

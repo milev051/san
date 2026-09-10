@@ -158,6 +158,13 @@ srušiti.** Kad sistem ubije servis pa ga alarm probudi, pokretanje ume da bude
 odbijeno. Pad bi u tri ujutru izgledao isto kao da kamera ne radi, pa se umesto
 toga upisuje `razlogPrekida` i vidi se ujutru.
 
+**Prikazuje se samo ono što izabrani režim koristi.** ISO ne postoji u noćnom
+režimu, broj kadrova ne postoji nigde osim u slaganju. Sve odjednom znači da se
+ono važno traži među onim što ne radi ništa, i da se podesi nešto što se neće ni
+pogledati. Grupe su `zaAuto`, `zaRucno` i `zaSlaganje`, a `osveziRezim` ih
+pokazuje i sakriva. Ručne vrednosti pripadaju i slaganju, jer tamo određuju
+jedan kadar od onoliko koliko ih se sabira.
+
 **Zaustavljanje traži dugi pritisak, pokretanje ne.** Ceo ekran je dugme jer se
 telefon pipa u mraku, ali bi tada jedan slučajan dodir prekinuo noć, a to se ne
 bi videlo do jutra. Zato je pokretanje jedan dodir, a zaustavljanje dugi
