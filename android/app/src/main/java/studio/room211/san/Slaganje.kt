@@ -70,9 +70,9 @@ object Slaganje {
 
         val izlaz = IntArray(sirina * visina)
         for (i in izlaz.indices) {
-            val r = if (zbirR!![i] > 255) 255 else zbirR!![i]
-            val g = if (zbirG!![i] > 255) 255 else zbirG!![i]
-            val b = if (zbirB!![i] > 255) 255 else zbirB!![i]
+            val r = stegni(zbirR!![i])
+            val g = stegni(zbirG!![i])
+            val b = stegni(zbirB!![i])
             izlaz[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
 
@@ -81,6 +81,30 @@ object Slaganje {
         spojena.compress(Bitmap.CompressFormat.JPEG, kvalitet, bafer)
         spojena.recycle()
         return bafer.toByteArray()
+    }
+
+    /** Odakle pocinje meko stezanje. Ispod toga je zbir netaknut. */
+    private const val KOLENO = 200
+
+    /**
+     * Zbir u opseg 0 do 255, mekano.
+     *
+     * Tvrdo secenje na 255 spljosti sve sto je svetlo u ravnu belu mrlju: gde
+     * god u sobi ima lampica ili prozora, tu se izgubi i oblik. Zato je do
+     * kolena netaknuto, a iznad njega se glatko primice belom i nikad je ne
+     * dostigne naglo.
+     *
+     * Tamni deo slike, a to je ovde skoro cela slika, ostaje savrseno linearan,
+     * jer se tek tamo vidi razlika koju je slaganje i donelo.
+     */
+    fun stegni(zbir: Int): Int {
+        if (zbir <= KOLENO) return if (zbir < 0) 0 else zbir
+        val preko = (zbir - KOLENO).toDouble()
+        val ostatak = 255.0 - KOLENO
+        // Zaokruzuje se, ne seče: odsecanje bi i potpuno prezaren piksel
+        // ostavilo na 254, pa bela nikad ne bi bila bela.
+        return kotlin.math.round(255.0 - ostatak * kotlin.math.exp(-preko / ostatak))
+            .toInt().coerceIn(0, 255)
     }
 
     /** Koliko puta je slika svetlija nego jedan kadar, priblizno. */

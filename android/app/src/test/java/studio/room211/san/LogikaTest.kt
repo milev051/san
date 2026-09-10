@@ -173,6 +173,43 @@ class LogikaTest {
         assertTrue(Pokret.razlikaBezSjaja(pre, posleSvetlije) > 0.4)
     }
 
+    // -------------------------------------------------------------- slaganje
+
+    @Test
+    fun `tamni deo slike ostaje netaknut posle slaganja`() {
+        // Skoro cela nocna slika je ovde, i tu se vidi sve sto je slaganje
+        // donelo, pa se ne sme dirati.
+        for (v in listOf(0, 1, 50, 120, 199, 200)) {
+            assertEquals(v, Slaganje.stegni(v))
+        }
+    }
+
+    @Test
+    fun `svetlo se primice belom, ali je ne prelazi`() {
+        assertTrue(Slaganje.stegni(300) in 201..255)
+        assertTrue(Slaganje.stegni(1000) in 201..255)
+        // Osam kadrova punog belog: bez stezanja bi ovo bilo 2040.
+        assertEquals(255, Slaganje.stegni(2040))
+    }
+
+    @Test
+    fun `stezanje je rastuce, pa se oblik svetla ne gubi`() {
+        // Tvrdo secenje bi svaku vrednost preko 255 spljostilo u istu belu
+        // mrlju i lampica u sobi bi izgubila oblik.
+        var pre = Slaganje.stegni(200)
+        for (v in 201..800) {
+            val sada = Slaganje.stegni(v)
+            assertTrue("pada na $v", sada >= pre)
+            pre = sada
+        }
+        assertTrue(Slaganje.stegni(260) < Slaganje.stegni(400))
+    }
+
+    @Test
+    fun `negativan zbir ne postoji, ali ne sme da izadje iz opsega`() {
+        assertEquals(0, Slaganje.stegni(-5))
+    }
+
     @Test
     fun `izbor uzima prvi kadar, promene i sidra`() {
         val razlike = listOf(0.0, 0.001, 0.002, 0.20, 0.001, 0.001)

@@ -89,18 +89,34 @@ najviše **1/6 s** i nema nijedan noćni režim, pa vredi probati ostale.
 
 | režim | šta radi | kada |
 |---|---|---|
-| **Noćni** | noćni režim samog telefona, kroz Camera2 Extensions | kad ga ta kamera nudi; ekran to kaže |
+| **Noćni** | noćni režim samog telefona | kad ga ta kamera nudi; ekran to kaže |
 | **Auto** | automatika, uz zaključavanje posle prve slike | kad u sobi ima nekog svetla |
 | **Ručno** | upisano vreme i ISO | kad kamera daje dovoljno dugu ekspoziciju |
 | **Slaganje** | snimi više kadrova zaredom i sabere ih u jedan | kad ništa od gornjeg ne daje svetlu sliku |
+
+**Noćni režim se traži na dva načina**, jer to nije isti spisak. Prvo preko
+platformskog Camera2 Extensions API-ja, pa preko CameraX proširenja, koja
+razgovaraju sa proizvođačevom bibliotekom direktno i ponekad vide ono što
+platforma ne prijavljuje. Dugme **Proveri noćni režim preko CameraX** u kartici
+Kamera odgovara na to pitanje za izabranu kameru. Ako ga ni tim putem nema,
+proizvođač ga drži u svojoj aplikaciji i nijednim API-jem ga ne daje.
 
 **Slaganje** je odgovor na telefon koji dužu ekspoziciju prosto ne dozvoljava.
 Osam kadrova od 1/6 s sabranih zajedno je isto svetlo kao jedan od 1,3 s, uz
 manje šuma, jer je šum slučajan u svakom kadru a slika ispod njega ista. To je
 i ono što noćni režim radi u proizvođačevom kodu.
 
+Svetla se ne seku tvrdo nego se glatko primiču belom, pa lampica ili prozor u
+sobi zadrže oblik umesto da postanu ravna bela mrlja. Tamni deo slike, a to je
+ovde skoro cela slika, ostaje netaknut.
+
 Cena: jedna slika traje nekoliko sekundi, izlaz je oko 2 MP, a pokret tokom tih
 par sekundi se razmaže. Za položaj tela ništa od toga ne smeta.
+
+**Slaganje neće izgledati kao Samsungov noćni režim, i to je očekivano.** Oni
+slažu sirove kadrove sa senzora, u više od osam bita, uz poravnavanje i
+uklanjanje šuma pisano za taj senzor. Ovde se slažu već sažete JPEG slike, u
+osam bita. Razlika u finoći je odatle, ne iz broja kadrova.
 
 Uz ručne vrednosti postoji dugme **Postavi na granicu telefona**, koje upiše
 najdužu ekspoziciju i najveći ISO koje ta kamera stvarno daje. Bez njega se

@@ -224,6 +224,21 @@ class Podesavanja : AppCompatActivity() {
 
         kameraOpis = body(this, opisKamera(sve))
         sadrzaj.addView(kameraOpis)
+
+        // Dva puta do istog proizvodjacevog koda daju razlicite odgovore, pa
+        // se drugi mora proveriti posebno. Traje par sekundi, zato dugme.
+        sadrzaj.addView(button(this, "Proveri noćni režim preko CameraX") {
+            kameraOpis.text = "Proveravam…"
+            posao.execute {
+                val id = cfg.kameraId.ifBlank { Kamera(this, cfg).idKamere() }
+                val ima = try { NocniX.dostupan(this, id) } catch (e: Exception) { false }
+                runOnUiThread {
+                    kameraOpis.text = opisKamera(sve) + "\n\nCameraX na kameri ${id ?: "?"}: " +
+                            if (ima) "NUDI noćni režim. Izaberi režim Noćni."
+                            else "ne nudi noćni režim. Ostaje Slaganje."
+                }
+            }
+        })
         return kartica
     }
 

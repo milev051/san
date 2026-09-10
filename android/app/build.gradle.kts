@@ -14,8 +14,8 @@ android {
         // direktno u DCIM, pa je 26 najniza granica koja jos ima smisla.
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.5"
+        versionCode = 6
+        versionName = "0.6"
     }
 
     buildTypes {
@@ -47,5 +47,14 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // CameraX prosirenja: drugi put do proizvodjacevog nocnog rezima.
+    // Platformski `CameraExtensionCharacteristics` na S23 ne prijavljuje nocni
+    // rezim ni na jednoj kameri, a CameraX ume da razgovara i sa starijim
+    // OEM bibliotekama koje platforma ne izlaze.
+    implementation("androidx.camera:camera-core:1.3.4")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-extensions:1.3.4")
     testImplementation("junit:junit:4.13.2")
 }

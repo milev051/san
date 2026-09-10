@@ -56,11 +56,27 @@ automatski, lice i bokeh. Zbog toga postoji izbor tačne kamere po oznaci, a ne
 samo prednja/zadnja, i kartica koja za svaku ispisuje raspon ekspozicije i
 proširenja.
 
+**Noćni režim se traži na dva načina, jer to nisu isti spiskovi.** Platformski
+`CameraExtensionCharacteristics` na S23 ne prijavljuje `EXTENSION_NIGHT` ni na
+jednoj kameri; CameraX proširenja razgovaraju sa OEM bibliotekom direktno i umeju
+sa starijim izdanjem te biblioteke. Prvo se proba platformski put jer je lakši,
+pa CameraX, pa tek onda obično snimanje, i uvek se kaže šta je stvarno urađeno.
+
+**CameraX se sme dirati samo sa glavne niti.** `LifecycleRegistry` i
+`bindToLifecycle` padaju sa bilo koje druge, a poziv dolazi sa radne niti
+servisa, pa ceo posao ide kroz `Handler(Looper.getMainLooper())` a pozivalac
+čeka na bravi. Isto pravilo kao AppKit u Mostu.
+
+**Pregled se vezuje i kad se ne prikazuje.** Deo proizvođačeve obrade radi nad
+tokom pregleda, pa bez njega neki uređaji odbiju snimak.
+
 **Kad telefon ne da dugu ekspoziciju, slaže se više kadrova.** `Slaganje.spoji`
 sabira, ne uprosečava: prosek osam mračnih kadrova je i dalje mračan, samo mu je
-šum manji. Sabiranje je ono što sliku posvetli, pa se vrednosti seku na 255
-umesto da se dele. Slaže se na 1600px duže strane, jer sabirač za 12 MP ne bi
-stao u memoriju.
+šum manji. Sabiranje je ono što sliku posvetli, pa se vrednosti ne dele nego
+mekano primiču belom: tvrdo sečenje na 255 spljoštilo bi svaku lampicu u ravnu
+belu mrlju. Ispod kolena je zbir netaknut, jer je tamo skoro cela noćna slika.
+Zaokružuje se, ne odseca, inače ni potpuno prezaren piksel ne bi bio čisto beo.
+Slaže se na 1600px duže strane, jer sabirač za 12 MP ne bi stao u memoriju.
 
 **Tražena ekspozicija nije dobijena ekspozicija.** Granica se razlikuje od
 modela do modela; sve iznad nje telefon tiho stegne na svoju vrednost, bez

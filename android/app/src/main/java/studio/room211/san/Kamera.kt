@@ -186,6 +186,30 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         // Nocni rezim ide svojim putem: druga vrsta sesije, drugi spisak
         // velicina, i bez ijedne rucne vrednosti. Kad ga nema, pada se na
         // obican snimak umesto da se pravimo da radi.
+        //
+        // Dva puta do istog proizvodjacevog koda, i nisu isti spisak: na S23
+        // platformski API ne prijavljuje nocni rezim ni na jednoj kameri, a
+        // CameraX razgovara sa OEM bibliotekom direktno. Prvo se proba lakse.
+        if (cfg.nocniRezim) {
+            val ugao = karakteristike.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                NocniRezim.dostupan(manager, id)
+            ) {
+                // platformski put, ispod
+            } else {
+                val prekoX = NocniX.snimi(ctx, id, ugao)
+                if (prekoX.bajtovi != null) return prekoX
+                val rezerva = obicanSnimak(id, karakteristike)
+                return Rezultat(
+                    rezerva.bajtovi,
+                    if (rezerva.bajtovi != null)
+                        "nema noćnog režima (${prekoX.greska}), snimljeno obično"
+                    else rezerva.greska,
+                    rezerva.ekspozicijaNs, rezerva.iso, rezerva.rucnoPrimenjeno,
+                )
+            }
+        }
+
         if (cfg.nocniRezim && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             NocniRezim.dostupan(manager, id)
         ) {
