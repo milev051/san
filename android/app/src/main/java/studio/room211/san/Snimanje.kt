@@ -112,10 +112,22 @@ class Snimanje : Service() {
             cfg.zakljucaniIso = 0
         }
         drziBudnim(true)
-        // Prva slika ide odmah, ne na sledecu tacku mreze. Sa razmakom od sat
-        // vremena bi se inace do prve potvrde cekalo sat vremena, a poenta
-        // potvrde je da se cuje dok jos stojis pored telefona.
-        posao.execute { snimiJedan(sada) }
+
+        // Zvuk ide ODMAH na pritisak, pre svakog posla: to je jedina potvrda
+        // koju imas dok jos stojis pored telefona okrenutog od tebe.
+        if (cfg.zvuk) Zvuk.pocetak(this, cfg)
+
+        // Prva slika ide posle odlaganja, ne odmah i ne na sledecu tacku mreze.
+        // Odmah bi uhvatila praznu sobu i tebe pored telefona; na mrezu bi se
+        // sa razmakom od sat vremena cekalo sat.
+        val odlaganje = cfg.odlozenoSek * 1000L
+        prijaviSe("prva slika za ${cfg.odlozenoSek}s")
+        posao.execute {
+            if (odlaganje > 0) {
+                try { Thread.sleep(odlaganje) } catch (e: InterruptedException) { return@execute }
+            }
+            if (cfg.aktivno) snimiJedan(System.currentTimeMillis())
+        }
     }
 
     private fun kadar() {
@@ -184,7 +196,7 @@ class Snimanje : Service() {
                 cfg.zakljucaniIso = ishod.iso
             }
 
-            if (cfg.zvuk && (redni <= 2 || cfg.zvukSvaka)) Zvuk.potvrda(this, cfg)
+            if (cfg.zvuk && (redni <= cfg.zvukDoSlike || cfg.zvukSvaka)) Zvuk.potvrda(this, cfg)
         }
 
         // Zapisnik ide i u Documents, uz smanjene kopije, da se ceo folder

@@ -62,10 +62,10 @@ Uveče, u sobi u kojoj ćeš i spavati:
      vidi, i to nije stvar podešavanja.
 4. Podesi **Rastojanje do kreveta**. Fokus se zaključava na tu vrednost, jer u
    mraku autofokus lovi i vraća mutan kadar bez ijedne greške.
-5. **Počni**. Prva slika ide odmah i **čuje se**. Druga se čuje na sledećem
-   punom minutu po mreži, i to je potvrda da se ponavljanje stvarno vrti.
-   Posle toga je tišina do jutra.
-6. Ujutru **Zaustavi**.
+5. **Pritisni dugme preko celog ekrana.** Odmah se čuje ton da je pokrenuto,
+   pa imaš deset sekundi da legneš. Prva slika ide tek onda, i čuje se, kao i
+   druga i treća. Posle toga je tišina do jutra.
+6. Ujutru **drži** dugme da zaustaviš.
 
 Ako usred noći zaustaviš pa ponovo pokreneš, **nastavlja se ista noć**: isti
 folder, isto brojanje slika i ista zaključana ekspozicija. Tek posle osam sati
@@ -94,12 +94,23 @@ Ako noćni snimak ne uspe, snima se obično, ali to piše u `noc.json` i na ekra
 
 ---
 
+## Prvi ekran
+
+Jedno dugme preko celog ekrana. Telefon visi iznad kreveta, okrenut od tebe, i
+uveče se pipa u mraku, pa se sitno dugme među karticama ne nalazi.
+
+**Zaustavljanje traži dugi pritisak.** Da je i ono običan dodir, jedan slučajan
+dodir u mraku prekinuo bi noć, a to se ne bi videlo do jutra.
+
+Podešavanja su na **⋮** u gornjem uglu, pregled noći na **noći**. Ispod dugmeta
+stoje poslednja snimljena slika, broj slika, vreme sledećeg okidanja, baterija i
+slobodno mesto.
+
 ## Pregled u aplikaciji
 
-Dok snima, na prvom ekranu se vidi **poslednja snimljena slika**, broj slika i
-vreme sledećeg okidanja. Dugme **Snimljene noći** otvara spisak svih noći sa
-brojem slika, trajanjem i brojem promena položaja; dodir na noć otvara mrežu
-sličica, a dodir na sličicu prikazuje ceo kadar.
+Dugme **noći** otvara spisak svih noći sa brojem slika, trajanjem i brojem
+promena položaja; dodir na noć otvara mrežu sličica, a dodir na sličicu
+prikazuje ceo kadar.
 
 Dugme **Izvezi za računar** upisuje male kopije i `noc.json` u `Documents/San/`,
 odakle se noć prebacuje kablom. Do izvoza te kopije stoje u privatnom folderu
@@ -138,7 +149,9 @@ u EXIF-u.
 | Prekini kad baterija padne na | 5% | ugašen telefon ne završi zapisnik |
 | Rastojanje do kreveta | 2 m | iz toga se računa fiksni fokus |
 | Vreme na arhivskoj slici | uključeno | na kopiji za analizu se upisuje uvek |
-| Zvučna potvrda | uključena | prva i druga slika, pa tišina |
+| Zvučna potvrda | uključena | ton na pritisak dugmeta, pa prve tri slike, pa tišina |
+| Prva slika posle | 10 s | toliko imaš da legneš |
+| Čuje se do koje slike | 3 | |
 | Sam prekini u sat | isključeno | |
 
 Na jedan minut je 480 slika i oko 1,9 GB po noći. Na pet minuta je 96 slika i

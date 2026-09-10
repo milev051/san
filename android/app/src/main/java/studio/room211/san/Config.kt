@@ -122,7 +122,23 @@ class Config(context: Context) {
 
     // ------------------------------------------------------------------ zvuk
 
-    /** Javi se na prve dve slike pa cuti do jutra. */
+    /**
+     * Koliko sekundi posle Start-a ide prva slika.
+     *
+     * Dugme se pritisne dok stojis pored telefona, a prva slika treba da uhvati
+     * krevet u kome vec lezis. Zvuk pri pritisku kaze da je pokrenuto, pa imas
+     * toliko vremena da legnes.
+     */
+    var odlozenoSek: Int
+        get() = prefs.getInt("odlozeno", 10)
+        set(v) = prefs.edit().putInt("odlozeno", v.coerceIn(0, 300)).apply()
+
+    /** Do koje slike se cuje potvrda. Posle toga tisina do jutra. */
+    var zvukDoSlike: Int
+        get() = prefs.getInt("zvuk_do", 3)
+        set(v) = prefs.edit().putInt("zvuk_do", v.coerceIn(0, 20)).apply()
+
+    /** Javi se na prve tri slike pa cuti do jutra. */
     var zvuk: Boolean
         get() = prefs.getBoolean("zvuk", true)
         set(v) = prefs.edit().putBoolean("zvuk", v).apply()

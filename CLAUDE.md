@@ -113,6 +113,18 @@ srušiti.** Kad sistem ubije servis pa ga alarm probudi, pokretanje ume da bude
 odbijeno. Pad bi u tri ujutru izgledao isto kao da kamera ne radi, pa se umesto
 toga upisuje `razlogPrekida` i vidi se ujutru.
 
+**Zaustavljanje traži dugi pritisak, pokretanje ne.** Ceo ekran je dugme jer se
+telefon pipa u mraku, ali bi tada jedan slučajan dodir prekinuo noć, a to se ne
+bi videlo do jutra. Zato je pokretanje jedan dodir, a zaustavljanje dugi
+pritisak.
+
+**Zvuk pri pokretanju ide PRE bilo kakvog posla, i drugim tonom.** To je jedina
+potvrda koju imaš dok stojiš pored telefona okrenutog od tebe, a po zvuku se
+mora razlikovati „primljeno je" od „slika je napravljena".
+
+**Prva slika ide posle odlaganja, ne odmah.** Odmah bi uhvatila praznu sobu i
+tebe pored telefona.
+
 **Greška usred noći se OGLAŠAVA.** Tišina inače znači „sve je u redu" i onda
 kada nije, a to se otkriva tek ujutru, kada je noć već propala.
 

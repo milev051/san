@@ -21,6 +21,14 @@ object Zvuk {
 
     fun potvrda(ctx: Context, cfg: Config) = oglasi(ctx, cfg, ToneGenerator.TONE_PROP_BEEP, 150)
 
+    /**
+     * Pritisnuto je dugme.
+     *
+     * Drugi ton od potvrde snimka, namerno: u mraku se ne gleda ekran, pa se po
+     * zvuku mora razlikovati „primljeno je" od „slika je napravljena".
+     */
+    fun pocetak(ctx: Context, cfg: Config) = oglasi(ctx, cfg, ToneGenerator.TONE_PROP_BEEP2, 300)
+
     /** Greska usred noci. Tisina inace znaci „sve je u redu" i kad nije. */
     fun greska(ctx: Context, cfg: Config) = oglasi(ctx, cfg, ToneGenerator.TONE_SUP_ERROR, 700)
 
