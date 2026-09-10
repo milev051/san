@@ -49,15 +49,25 @@ class Config(context: Context) {
         set(v) = prefs.edit().putInt("kvalitet", v.coerceIn(60, 100)).apply()
 
     /**
-     * Rucna ekspozicija.
+     * Kako se snima: `auto`, `noc` ili `rucno`.
      *
-     * Automatika u mraku luta: jedna slika crna, sledeca prosvetljena. Kad se
-     * vrednosti zakljucaju, sve slike jedne noci postaju uporedive, sto je
-     * uslov da merenje pokreta uopste ima smisla.
+     * Tri iskljuciva puta, ne tri prekidaca koja se sabiraju:
+     *
+     *  `auto`   automatika telefona, uz zakljucavanje posle prve slike
+     *  `noc`    nocni rezim samog telefona preko Camera2 Extensions; telefon
+     *           spaja vise kadrova i sam bira ekspoziciju, pa rucnih vrednosti
+     *           tu nema i ne mogu se ni traziti
+     *  `rucno`  upisano vreme ekspozicije i ISO
      */
-    var rucnaEkspozicija: Boolean
-        get() = prefs.getBoolean("rucna_eksp", false)
-        set(v) = prefs.edit().putBoolean("rucna_eksp", v).apply()
+    var rezim: String
+        get() = prefs.getString("rezim", if (prefs.getBoolean("rucna_eksp", false)) "rucno" else "auto")!!
+        set(v) = prefs.edit().putString("rezim", v).apply()
+
+    val rucnaEkspozicija: Boolean
+        get() = rezim == "rucno"
+
+    val nocniRezim: Boolean
+        get() = rezim == "noc"
 
     /** Vreme ekspozicije u nanosekundama. Granicu odredjuje telefon, ne mi. */
     var ekspozicijaNs: Long

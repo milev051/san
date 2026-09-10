@@ -24,6 +24,32 @@ na sliku upisuje vreme, slika se iznova kodira i EXIF nestane, pa bi traka bila
 nacrtana bočno i takva ostala zauvek. Okretanje se primenjuje na piksele u
 `Slika.uspravno`, PRE crtanja trake, a gotova slika dobija uspravnu oznaku.
 
+**Noćni režim i ručne vrednosti se međusobno isključuju.** U proširenoj sesiji
+(`CameraExtensionSession`) dozvoljeni su samo ključevi koje uređaj prijavi kroz
+`getAvailableCaptureRequestKeys`, a `SENSOR_EXPOSURE_TIME` nije među njima:
+ekspoziciju bira proizvođačev kod. Zato je režim jedan izbor od tri, a ne tri
+prekidača koja se sabiraju. Ključ koji uređaj nije prijavio ruši ceo snimak
+izuzetkom, pa se postavlja samo ono što je dozvoljeno.
+
+**Proširenja imaju svoj spisak veličina.** Uzimaju se iz
+`getExtensionSupportedSizes`, ne iz `SCALER_STREAM_CONFIGURATION_MAP`; veličina
+van tog spiska obara konfiguraciju sesije.
+
+**Proširena sesija traži živi pregled pre snimka.** Bez ponavljajućeg zahteva
+proizvođačev kod nema iz čega da slaže kadrove.
+
+**Noćni snimak traje sekundama, ne milisekundama.** Rok čekanja je 45 sekundi.
+Sa istim rokom kao za običan snimak, noćni bi se prekidao taman kad radi.
+
+**Kad noćni režim ne uspe, snima se obično, ali se to KAŽE.** Slika bez noćnog
+režima je bolja od nijedne slike, a prećutana zamena znači da bi se cela noć
+snimila loše a da niko ne zna zašto.
+
+**Merenje pokreta ne sme da broji promenu svetline.** Noćni režim bira
+ekspoziciju za svaki snimak, pa dva kadra iste mirne sobe umeju da budu
+različito svetla. `Pokret.razlikaBezSjaja` svakoj sličici oduzme njenu srednju
+svetlinu pre poređenja; bez toga mirna noć izgleda nemirno.
+
 **Tražena ekspozicija nije dobijena ekspozicija.** Granica se razlikuje od
 modela do modela; sve iznad nje telefon tiho stegne na svoju vrednost, bez
 greške, pa izgleda kao da podešavanje ne radi. Zato se iz `CaptureResult` čita

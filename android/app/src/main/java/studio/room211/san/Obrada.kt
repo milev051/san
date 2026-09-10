@@ -27,6 +27,7 @@ object Obrada {
         val iso: Int = 0,
         val rucnoPrimenjeno: Boolean = false,
         val uri: String = "",
+        val nocni: Boolean = false,
     )
 
     /** Folder sa malim kopijama jedne noci, unutar aplikacije. */
@@ -56,7 +57,9 @@ object Obrada {
         if (mala != null) {
             val slicica = Zig.slicica(mala)
             cfg.prethodnaSlicica?.let { pre ->
-                if (pre.size == slicica.size) pokret = Pokret.razlika(pre, slicica)
+                // Bez sjaja: nocni rezim bira ekspoziciju po snimku, pa bi
+                // sirova razlika svaku promenu svetline prijavila kao pokret.
+                if (pre.size == slicica.size) pokret = Pokret.razlikaBezSjaja(pre, slicica)
             }
             cfg.prethodnaSlicica = slicica
 
@@ -86,8 +89,8 @@ object Obrada {
         ) ?: return Ishod(ime, pokret, "upis u DCIM nije uspeo")
 
         return Ishod(
-            ime, pokret, "",
-            snimak.ekspozicijaNs, snimak.iso, snimak.rucnoPrimenjeno, uri.toString(),
+            ime, pokret, snimak.greska,
+            snimak.ekspozicijaNs, snimak.iso, snimak.rucnoPrimenjeno, uri.toString(), snimak.nocni,
         )
     }
 

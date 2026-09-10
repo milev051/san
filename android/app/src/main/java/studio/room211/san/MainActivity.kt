@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pocniDugme: com.google.android.material.button.MaterialButton
     private lateinit var stopDugme: com.google.android.material.button.MaterialButton
     private lateinit var poslednja: ImageView
+    private lateinit var rezimOpis: TextView
     private val posao = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +84,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         osvezi()
+        osveziRezim()
     }
 
     private fun naslov() = TextView(this).apply {
@@ -217,7 +219,11 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 val opis = StringBuilder()
                 opis.append(sposobnosti?.opis() ?: "Kamera nije dostupna")
+                val prosirenja = kamera.nocniRezimi()
+                opis.append("\nRežimi telefona: " +
+                        if (prosirenja.isEmpty()) "nijedan" else prosirenja.joinToString(", "))
                 opis.append("\nSnimak je trajao ${trajalo / 1000.0}s")
+                if (ishod.nocni) opis.append("\nSnimljeno NOĆNIM režimom telefona")
                 if (ishod.bajtovi != null) {
                     // Uspravno, isto kao što će biti sačuvano. `BitmapFactory`
                     // ne gleda EXIF, pa je slika ovde ranije stajala bočno.
@@ -293,8 +299,13 @@ class MainActivity : AppCompatActivity() {
             else -> 4.0
         }
         val gb = broj * poSlici / 1024.0
-        return "Osam sati na ${cfg.razmakMin} min je oko $broj slika, " +
+        val osnovno = "Osam sati na ${cfg.razmakMin} min je oko $broj slika, " +
                 "približno %.1f GB po noći.".format(gb)
+        // Nocni snimak traje sekundama, jer telefon slaze vise kadrova.
+        return if (cfg.rezim == "noc" && cfg.razmakMin < 2) {
+            "$osnovno\nUPOZORENJE: noćni snimak traje nekoliko sekundi, pa razmak od jednog " +
+                    "minuta ostavlja malo vremena između kadrova. Uzmi bar 2 minuta."
+        } else osnovno
     }
 
     // ----------------------------------------------------------------- slika
@@ -316,17 +327,21 @@ class MainActivity : AppCompatActivity() {
         sadrzaj.addView(body(this, "Na kopiji koja ide modelu vreme se upisuje uvek, jer je " +
                 "tamo jedino sidro za redosled."))
 
+        sadrzaj.addView(body(this, "Kako se snima. Tri odvojena puta, ne prekidači koji se sabiraju."))
+        sadrzaj.addView(choice(
+            this,
+            listOf("noc" to "Noćni", "auto" to "Automatika", "rucno" to "Ručno"),
+            cfg.rezim,
+        ) { cfg.rezim = it; osveziRezim() })
+
+        rezimOpis = body(this, "")
+        sadrzaj.addView(rezimOpis)
+
         sadrzaj.addView(switch(this, "Zaključaj ekspoziciju posle prve slike",
             cfg.zakljucajPosleParve) { cfg.zakljucajPosleParve = it })
-        sadrzaj.addView(body(this, "Prva slika se snimi automatikom, iz nje se pročita koju je " +
-                "ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide tim vrednostima. " +
-                "Tako su sve slike uporedive, a ne moraš da pogađaš brojeve."))
-
-        sadrzaj.addView(switch(this, "Ručna ekspozicija", cfg.rucnaEkspozicija) {
-            cfg.rucnaEkspozicija = it
-        })
-        sadrzaj.addView(body(this, "Ručne vrednosti imaju prednost nad zaključanim. Ako ih telefon " +
-                "ne prihvati, Noćna proba to kaže: ispisuje i traženo i dobijeno."))
+        sadrzaj.addView(body(this, "Važi za Automatiku. Prva slika se snimi automatikom, iz nje se " +
+                "pročita koju je ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide " +
+                "tim vrednostima, pa su sve slike uporedive."))
 
         sadrzaj.addView(field(this, "Ekspozicija, 1/x sekunde", ekspozicijaTekst()) { uneto ->
             uneto.toIntOrNull()?.let { if (it > 0) cfg.ekspozicijaNs = 1_000_000_000L / it }
@@ -340,6 +355,32 @@ class MainActivity : AppCompatActivity() {
         sadrzaj.addView(body(this, "Fokus se zaključava na to rastojanje. U mraku autofokus lovi " +
                 "i vraća mutan kadar, bez ijedne greške."))
         return kartica
+    }
+
+    /**
+     * Opis izabranog režima, sa odgovorom na jedino pitanje koje je važno:
+     * da li ga ovaj telefon uopšte ima.
+     */
+    private fun osveziRezim() {
+        val kamera = Kamera(this, cfg)
+        val ima = try { kamera.nocniDostupan() } catch (e: Exception) { false }
+        rezimOpis.text = when (cfg.rezim) {
+            "noc" -> if (ima) {
+                "Noćni režim samog telefona: senzor snimi više kadrova različite dužine i " +
+                        "proizvođačev kod ih spoji u jednu svetliju sliku sa manje šuma. Isto što " +
+                        "radi Kamera kad u mraku sačekaš par sekundi.\n" +
+                        "Jedan snimak traje nekoliko sekundi, pa razmak ispod jednog minuta ovde " +
+                        "nema smisla. Ekspoziciju bira telefon; ručne vrednosti se ne mogu tražiti."
+            } else {
+                "UPOZORENJE: ovaj telefon ne prijavljuje noćni režim na izabranoj kameri. " +
+                        "Snimaće se obično. Probaj drugu kameru ili izaberi Automatiku."
+            }
+            "rucno" -> "Upisane vrednosti ispod. Ako ih telefon ne prihvati, Noćna proba to kaže: " +
+                    "ispisuje i traženo i dobijeno."
+            else -> "Automatika telefona. Uz zaključavanje ispod, prva slika određuje vrednosti za " +
+                    "celu noć." + if (ima) "\nOvaj telefon ima i noćni režim: " +
+                    kamera.nocniRezimi().joinToString(", ") + "." else ""
+        }
     }
 
     private fun ekspozicijaTekst(): String =

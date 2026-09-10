@@ -153,6 +153,27 @@ class LogikaTest {
     }
 
     @Test
+    fun `promena svetline nije pokret`() {
+        // Nocni rezim bira ekspoziciju po snimku, pa ista mirna soba ume da
+        // bude svetlija na sledecem kadru. To ne sme da se broji kao pokret.
+        val tamna = intArrayOf(40, 80, 120, 160)
+        val svetla = intArrayOf(80, 120, 160, 200)
+        assertEquals(0.0, Pokret.razlikaBezSjaja(tamna, svetla), 1e-9)
+        // Sirova razlika bi tu prijavila pun pomeraj svakog piksela.
+        assertEquals(40 / 255.0, Pokret.razlika(tamna, svetla), 1e-9)
+    }
+
+    @Test
+    fun `stvaran pomeraj se i dalje vidi bez obzira na svetlinu`() {
+        val pre = intArrayOf(0, 0, 255, 255)
+        val posle = intArrayOf(255, 255, 0, 0)
+        assertTrue(Pokret.razlikaBezSjaja(pre, posle) > 0.5)
+        // Ista scena posvetljena za 30 daje isti nalaz.
+        val posleSvetlije = IntArray(4) { (posle[it] + 30).coerceAtMost(255) }
+        assertTrue(Pokret.razlikaBezSjaja(pre, posleSvetlije) > 0.4)
+    }
+
+    @Test
     fun `izbor uzima prvi kadar, promene i sidra`() {
         val razlike = listOf(0.0, 0.001, 0.002, 0.20, 0.001, 0.001)
         val izabrani = Pokret.izbor(razlike, prag = 0.045, sidroNa = 12)

@@ -12,6 +12,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Range
@@ -128,13 +129,58 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         val ekspozicijaNs: Long = 0,
         val iso: Int = 0,
         val rucnoPrimenjeno: Boolean = false,
+        val nocni: Boolean = false,
     )
+
+    /** Da li telefon nudi svoj nocni rezim na izabranoj kameri. */
+    fun nocniDostupan(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        val id = idKamere() ?: return false
+        return NocniRezim.dostupan(manager, id)
+    }
+
+    fun nocniRezimi(): List<String> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return emptyList()
+        val id = idKamere() ?: return emptyList()
+        return NocniRezim.imenaRezima(manager, id)
+    }
 
     fun snimi(): Rezultat {
         val id = idKamere() ?: return Rezultat(null, "nema kamere")
         val karakteristike = manager.getCameraCharacteristics(id)
+
+        // Nocni rezim ide svojim putem: druga vrsta sesije, drugi spisak
+        // velicina, i bez ijedne rucne vrednosti. Kad ga nema, pada se na
+        // obican snimak umesto da se pravimo da radi.
+        if (cfg.nocniRezim && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            NocniRezim.dostupan(manager, id)
+        ) {
+            val velicine = NocniRezim.velicine(manager, id)
+            val velicina = izabranaVelicina(velicine)
+            if (velicina != null) {
+                val ishod = NocniRezim.snimi(
+                    ctx, manager, id, velicina, cfg.kvalitet,
+                    karakteristike.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90,
+                )
+                if (ishod.bajtovi != null) return ishod
+                // Nocni snimak nije uspeo: obican je bolji od nijednog, ali se
+                // razlog prenosi dalje da se vidi da nocni ne radi.
+                val rezerva = obicanSnimak(id, karakteristike)
+                return Rezultat(
+                    rezerva.bajtovi,
+                    if (rezerva.bajtovi != null) "noćni režim nije uspeo (${ishod.greska}), snimljeno obično"
+                    else rezerva.greska,
+                    rezerva.ekspozicijaNs, rezerva.iso, rezerva.rucnoPrimenjeno,
+                )
+            }
+        }
+        return obicanSnimak(id, karakteristike)
+    }
+
+    private fun obicanSnimak(id: String, karakteristike: CameraCharacteristics): Rezultat {
         val velicina = izabranaVelicina(velicine(karakteristike.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)))
             ?: return Rezultat(null, "kamera ne nudi JPEG")
+
 
         val nit = HandlerThread("kamera").apply { start() }
         val ruka = Handler(nit.looper)

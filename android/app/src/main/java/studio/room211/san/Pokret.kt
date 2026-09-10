@@ -32,6 +32,27 @@ object Pokret {
     }
 
     /**
+     * Razlika iz koje je uklonjena promena ukupne svetline.
+     *
+     * Nocni rezim telefona sam bira ekspoziciju za svaki snimak, pa dva kadra
+     * iste mirne sobe umeju da budu razlicito svetla. Sirova razlika bi to
+     * prijavila kao pokret, i mirna noc bi izgledala nemirno.
+     *
+     * Zato se svakoj slicici prvo oduzme njena srednja svetlina, pa se porede
+     * odstupanja od proseka. Ravnomerno posvetljena soba tada daje nulu, a
+     * covek koji se okrenuo i dalje daje isto sto i pre.
+     */
+    fun razlikaBezSjaja(a: IntArray, b: IntArray): Double {
+        require(a.size == b.size) { "slicice moraju biti iste velicine" }
+        if (a.isEmpty()) return 0.0
+        val sa = a.average()
+        val sb = b.average()
+        var zbir = 0.0
+        for (i in a.indices) zbir += kotlin.math.abs((a[i] - sa) - (b[i] - sb))
+        return zbir / (a.size * 255.0)
+    }
+
+    /**
      * Koji kadrovi idu modelu: svaki preko praga, plus po jedan na `sidroNa`
      * kadrova da se i mirni delovi noci vide.
      *

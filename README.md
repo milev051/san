@@ -49,10 +49,17 @@ Uveče, u sobi u kojoj ćeš i spavati:
 2. **Noćna proba** → „Snimi probnu sliku". Pogledaj šta se vidi u mraku.
    Ekran ispisuje i koliki raspon ekspozicije tvoj telefon uopšte dozvoljava,
    jer se to razlikuje od modela do modela.
-3. Ako je slika crna: uključi **Ručnu ekspoziciju**, produži vreme (`1/x`,
-   probaj 8, pa 4, pa 2), podigni ISO, pa ponovo probaj. Ako ni tada ništa,
-   treba ti slabo svetlo u sobi; kamera bez svetla ne vidi, i to nije stvar
-   podešavanja.
+3. Ako je slika crna, redom:
+   - **Režim → Noćni**. To je noćni režim samog telefona, isti onaj koji
+     Kamera koristi kad u mraku sačekaš par sekundi: senzor snimi više kadrova
+     različite dužine i proizvođačev kod ih spoji u jednu svetliju sliku sa
+     manje šuma. Radi na Samsung S23 i svemu što ga prijavi kroz Camera2
+     Extensions; ako ga telefon nema, ekran to jasno kaže.
+   - Ako ni tako ništa, **Ručno**: produži vreme (`1/x`, probaj 8, pa 4, pa 2)
+     i podigni ISO. Noćna proba ispisuje i traženo i dobijeno, pa se odmah vidi
+     kad telefon odbija traženu vrednost.
+   - Ako ni tada ništa, treba ti slabo svetlo u sobi. Kamera bez svetla ne
+     vidi, i to nije stvar podešavanja.
 4. Podesi **Rastojanje do kreveta**. Fokus se zaključava na tu vrednost, jer u
    mraku autofokus lovi i vraća mutan kadar bez ijedne greške.
 5. **Počni**. Prva slika ide odmah i **čuje se**. Druga se čuje na sledećem
@@ -67,6 +74,23 @@ zaustavljeno u 10:00 narednog dana ostaje jedan folder, `2026-09-10`.
 
 Ako se usred noći nešto pokvari (nestane mesta, sistem oduzme kameru),
 aplikacija se **oglasi**. Tišina znači da sve radi.
+
+---
+
+## Noćni režim
+
+**Režim → Noćni** koristi ono što telefon već ima. Ne pišemo mi slaganje
+kadrova nego ga tražimo od proizvođača, kroz standardni Camera2 Extensions API.
+
+Dve posledice koje treba znati:
+
+- **Jedan snimak traje nekoliko sekundi**, pa razmak od jednog minuta nema
+  smisla. Uzmi bar dva.
+- **Ekspoziciju bira telefon i ne može se zaključati.** Zbog toga se merenje
+  pokreta radi tako da promena svetline ne prolazi kao pokret; svakoj sličici
+  se pre poređenja oduzme njena srednja svetlina.
+
+Ako noćni snimak ne uspe, snima se obično, ali to piše u `noc.json` i na ekranu.
 
 ---
 
@@ -109,8 +133,8 @@ u EXIF-u.
 | Razmak | 5 min | 1, 2, 3, 5, 10, 15, 30 ili 60. Slika se na pun minut po satu, ne od trenutka pokretanja |
 | Rezolucija | puna | ekran odmah kaže koliko je to slika i gigabajta po noći |
 | Kamera | zadnja | veći senzor, a ekran gleda od kreveta |
-| Zaključaj ekspoziciju posle prve slike | uključeno | prva slika ide automatikom, iz nje se pročita šta je telefon stvarno upotrebio, ostatak noći ide tim vrednostima |
-| Ručna ekspozicija | isključena | ima prednost nad zaključanom; ako je telefon ne prihvati, Noćna proba to kaže |
+| Režim | Automatika | **Noćni**, Automatika ili Ručno. Tri odvojena puta |
+| Zaključaj ekspoziciju posle prve slike | uključeno | važi za Automatiku: prva slika određuje vrednosti za celu noć |
 | Prekini kad baterija padne na | 5% | ugašen telefon ne završi zapisnik |
 | Rastojanje do kreveta | 2 m | iz toga se računa fiksni fokus |
 | Vreme na arhivskoj slici | uključeno | na kopiji za analizu se upisuje uvek |

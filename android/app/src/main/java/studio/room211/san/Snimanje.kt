@@ -168,15 +168,16 @@ class Snimanje : Service() {
             cfg.poslednjaSlika = vreme
             cfg.poslednjaGreska = ""
             zapisnik.dodaj(
-                vreme, ishod.ime, ishod.pokret, cfg.razmakMin,
+                vreme, ishod.ime, ishod.pokret, cfg.razmakMin, greska = ishod.greska,
                 uri = ishod.uri, ekspozicijaNs = ishod.ekspozicijaNs, iso = ishod.iso,
+                nocni = ishod.nocni,
             )
 
             // Zakljucavanje posle prve slike: automatika jednom odredi
             // ekspoziciju, procita se sta je stvarno upotrebila, i ostatak noci
             // se snima tim istim vrednostima. Bez toga automatika u mraku luta
             // od kadra do kadra i merenje pokreta poredi neuporedivo.
-            if (cfg.zakljucajPosleParve && !cfg.rucnaEkspozicija &&
+            if (cfg.zakljucajPosleParve && cfg.rezim == "auto" &&
                 cfg.zakljucanaEkspozicijaNs == 0L && ishod.ekspozicijaNs > 0 && ishod.iso > 0
             ) {
                 cfg.zakljucanaEkspozicijaNs = ishod.ekspozicijaNs
