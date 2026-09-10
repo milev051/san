@@ -60,8 +60,26 @@ Uveče, u sobi u kojoj ćeš i spavati:
    Posle toga je tišina do jutra.
 6. Ujutru **Zaustavi**.
 
+Ako usred noći zaustaviš pa ponovo pokreneš, **nastavlja se ista noć**: isti
+folder, isto brojanje slika i ista zaključana ekspozicija. Tek posle osam sati
+od poslednje slike počinje nova noć. Zato snimanje pokrenuto u 22:00 i
+zaustavljeno u 10:00 narednog dana ostaje jedan folder, `2026-09-10`.
+
 Ako se usred noći nešto pokvari (nestane mesta, sistem oduzme kameru),
 aplikacija se **oglasi**. Tišina znači da sve radi.
+
+---
+
+## Pregled u aplikaciji
+
+Dok snima, na prvom ekranu se vidi **poslednja snimljena slika**, broj slika i
+vreme sledećeg okidanja. Dugme **Snimljene noći** otvara spisak svih noći sa
+brojem slika, trajanjem i brojem promena položaja; dodir na noć otvara mrežu
+sličica, a dodir na sličicu prikazuje ceo kadar.
+
+Dugme **Izvezi za računar** upisuje male kopije i `noc.json` u `Documents/San/`,
+odakle se noć prebacuje kablom. Do izvoza te kopije stoje u privatnom folderu
+aplikacije i ne vide se u galeriji.
 
 ---
 
@@ -72,7 +90,7 @@ DCIM/San/2026/09/2026-09-10/          pune slike, vide se u galeriji
   2026-09-10_23-00-00.jpg
   2026-09-11_03-45-00.jpg
 
-Documents/San/2026/09/2026-09-10/     ovo se prebacuje na računar
+Documents/San/2026/09/2026-09-10/     tek posle dugmeta „Izvezi za računar"
   iste slike smanjene na 768px
   noc.json                            zapisnik: vremena, pokret po kadru, rupe
 ```
@@ -91,7 +109,9 @@ u EXIF-u.
 | Razmak | 5 min | 1, 2, 3, 5, 10, 15, 30 ili 60. Slika se na pun minut po satu, ne od trenutka pokretanja |
 | Rezolucija | puna | ekran odmah kaže koliko je to slika i gigabajta po noći |
 | Kamera | zadnja | veći senzor, a ekran gleda od kreveta |
-| Ručna ekspozicija | isključena | uključi je čim proba pokaže da automatika luta |
+| Zaključaj ekspoziciju posle prve slike | uključeno | prva slika ide automatikom, iz nje se pročita šta je telefon stvarno upotrebio, ostatak noći ide tim vrednostima |
+| Ručna ekspozicija | isključena | ima prednost nad zaključanom; ako je telefon ne prihvati, Noćna proba to kaže |
+| Prekini kad baterija padne na | 5% | ugašen telefon ne završi zapisnik |
 | Rastojanje do kreveta | 2 m | iz toga se računa fiksni fokus |
 | Vreme na arhivskoj slici | uključeno | na kopiji za analizu se upisuje uvek |
 | Zvučna potvrda | uključena | prva i druga slika, pa tišina |

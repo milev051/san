@@ -16,6 +16,15 @@ class Config(context: Context) {
 
         /** Duza strana kopije koja ide modelu. Za razliku ledja i boka vise ne treba. */
         const val ANALIZA_STRANA = 768
+
+        /**
+         * Prekid snimanja se nastavlja u ISTU noc ako je kraci od ovoga.
+         *
+         * Ustao si do kupatila, zaustavio snimanje i vratio se: to je i dalje
+         * ista noc, isti folder i isto brojanje. Osam sati je granica jer je to
+         * vec sledeci dan i sledeci san, a ne pauza.
+         */
+        const val NASTAVAK_MS = 8 * 3600_000L
     }
 
     // ------------------------------------------------------------ podesavanja
@@ -70,6 +79,33 @@ class Config(context: Context) {
         get() = prefs.getFloat("rastojanje", 2.0f)
         set(v) = prefs.edit().putFloat("rastojanje", v.coerceIn(0.2f, 20f)).apply()
 
+    /**
+     * Zakljucaj automatiku posle prve slike.
+     *
+     * Prva slika se snimi automatikom, iz nje se procita koliku je ekspoziciju
+     * i ISO telefon stvarno upotrebio, i ostatak noci se snima tim vrednostima.
+     * Time se dobija ono zbog cega postoji rucni rezim, bez pogadjanja brojeva:
+     * sve slike jedne noci su uporedive, sto je uslov da merenje pokreta ima
+     * smisla.
+     */
+    var zakljucajPosleParve: Boolean
+        get() = prefs.getBoolean("zakljucaj", true)
+        set(v) = prefs.edit().putBoolean("zakljucaj", v).apply()
+
+    /** Vrednosti procitane iz prve slike; 0 znaci da jos nisu zakljucane. */
+    var zakljucanaEkspozicijaNs: Long
+        get() = prefs.getLong("zakljucana_eksp", 0)
+        set(v) = prefs.edit().putLong("zakljucana_eksp", v).apply()
+
+    var zakljucaniIso: Int
+        get() = prefs.getInt("zakljucani_iso", 0)
+        set(v) = prefs.edit().putInt("zakljucani_iso", v).apply()
+
+    /** Ispod ovoga se snimanje prekida, da se telefon ne ugasi usred noci. */
+    var pragBaterije: Int
+        get() = prefs.getInt("prag_baterije", 5)
+        set(v) = prefs.edit().putInt("prag_baterije", v.coerceIn(0, 50)).apply()
+
     var zigNaArhivi: Boolean
         get() = prefs.getBoolean("zig_arhiva", true)
         set(v) = prefs.edit().putBoolean("zig_arhiva", v).apply()
@@ -108,6 +144,16 @@ class Config(context: Context) {
     var pocetak: Long
         get() = prefs.getLong("pocetak", 0)
         set(v) = prefs.edit().putLong("pocetak", v).apply()
+
+    /** Noc u koju se upisuje, `2026-09-10`. Ostaje ista kroz kratke prekide. */
+    var tekucaNoc: String
+        get() = prefs.getString("tekuca_noc", "")!!
+        set(v) = prefs.edit().putString("tekuca_noc", v).apply()
+
+    /** Vreme poslednje uspesne slike; iz njega se odlucuje da li je prekid nastavak. */
+    var poslednjaSlika: Long
+        get() = prefs.getLong("poslednja_slika", 0)
+        set(v) = prefs.edit().putLong("poslednja_slika", v).apply()
 
     var brojSlika: Int
         get() = prefs.getInt("broj", 0)

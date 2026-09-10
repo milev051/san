@@ -78,6 +78,19 @@ object Raspored {
     fun zigTekst(vreme: Long, redni: Int, zona: ZoneId = ZoneId.systemDefault()): String =
         "%s  #%03d".format(Instant.ofEpochMilli(vreme).atZone(zona).format(ZIG), redni)
 
+    /**
+     * Da li novo pokretanje nastavlja istu noc.
+     *
+     * Ustao si do kupatila, zaustavio snimanje i vratio se: to je i dalje ista
+     * noc, isti folder, isto brojanje i ista zakljucana ekspozicija. Posle
+     * granice je to vec sledeci san, pa ide nov folder.
+     *
+     * Racuna se od POSLEDNJE SLIKE, ne od trenutka zaustavljanja: samo ona
+     * kaze dokle je noc stvarno snimana.
+     */
+    fun nastavakIste(sada: Long, poslednjaSlika: Long, granicaMs: Long): Boolean =
+        poslednjaSlika > 0 && sada >= poslednjaSlika && sada - poslednjaSlika < granicaMs
+
     /** Koliko slika stane u noc od `sati` na zadatom razmaku; za upozorenje u podesavanjima. */
     fun slikaZaNoc(razmakMin: Int, sati: Int = 8): Int = sati * 60 / razmakMin
 }

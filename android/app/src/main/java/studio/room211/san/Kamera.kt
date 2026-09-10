@@ -9,6 +9,7 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.ImageReader
 import android.os.Handler
@@ -112,7 +113,22 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         return sve.firstOrNull { it.width.toLong() * it.height <= granica } ?: sve.last()
     }
 
-    class Rezultat(val bajtovi: ByteArray?, val greska: String)
+    /**
+     * `ekspozicijaNs` i `iso` su ono sto je senzor STVARNO upotrebio, procitano
+     * iz `CaptureResult`, a ne ono sto je trazeno.
+     *
+     * Bez te razlike se ne moze videti da telefon odbija traizenu vrednost:
+     * granice ekspozicije se razlikuju od modela do modela, pa se svaki
+     * trazeni broj iznad granice tiho stegne na istu vrednost, i izgleda kao
+     * da podesavanje ne radi.
+     */
+    class Rezultat(
+        val bajtovi: ByteArray?,
+        val greska: String,
+        val ekspozicijaNs: Long = 0,
+        val iso: Int = 0,
+        val rucnoPrimenjeno: Boolean = false,
+    )
 
     fun snimi(): Rezultat {
         val id = idKamere() ?: return Rezultat(null, "nema kamere")
@@ -131,6 +147,9 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
 
         var bajtovi: ByteArray? = null
         var greska = ""
+        var stvarnaEkspozicija = 0L
+        var stvarniIso = 0
+        var rucnoPrimenjeno = false
         val gotovo = CountDownLatch(1)
 
         citac.setOnImageAvailableListener({ c ->
@@ -207,9 +226,33 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
                 set(CaptureRequest.JPEG_ORIENTATION,
                     (karakteristike.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90))
             }
-            s.capture(snimak.build(), null, ruka)
+            val ocitano = CountDownLatch(1)
+            s.capture(snimak.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    sesija: CameraCaptureSession,
+                    zahtev: CaptureRequest,
+                    rezultat: android.hardware.camera2.TotalCaptureResult,
+                ) {
+                    stvarnaEkspozicija = rezultat.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L
+                    stvarniIso = rezultat.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0
+                    rucnoPrimenjeno =
+                        rezultat.get(CaptureResult.CONTROL_AE_MODE) == CameraMetadata.CONTROL_AE_MODE_OFF
+                    ocitano.countDown()
+                }
 
-            if (!gotovo.await(15, TimeUnit.SECONDS)) greska = "snimak nije stigao"
+                override fun onCaptureFailed(
+                    sesija: CameraCaptureSession,
+                    zahtev: CaptureRequest,
+                    razlog: android.hardware.camera2.CaptureFailure,
+                ) {
+                    greska = "snimak odbijen, razlog ${razlog.reason}"
+                    ocitano.countDown()
+                    gotovo.countDown()
+                }
+            }, ruka)
+
+            if (!gotovo.await(20, TimeUnit.SECONDS)) greska = "snimak nije stigao"
+            ocitano.await(2, TimeUnit.SECONDS)
             s.close()
         } catch (e: SecurityException) {
             greska = "nema dozvole za kameru"
@@ -223,7 +266,11 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
             nit.quitSafely()
         }
 
-        return Rezultat(bajtovi, if (bajtovi == null && greska.isBlank()) "prazan snimak" else greska)
+        return Rezultat(
+            bajtovi,
+            if (bajtovi == null && greska.isBlank()) "prazan snimak" else greska,
+            stvarnaEkspozicija, stvarniIso, rucnoPrimenjeno,
+        )
     }
 
     /**
@@ -239,15 +286,38 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
             CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
         )
 
-        if (cfg.rucnaEkspozicija && rucnoMoguce) {
+        // Rucno unete vrednosti imaju prednost; posle njih dolaze one
+        // zakljucane iz prve slike; ako nema ni jednih, radi automatika.
+        val trazenaEkspozicija = when {
+            cfg.rucnaEkspozicija -> cfg.ekspozicijaNs
+            cfg.zakljucanaEkspozicijaNs > 0 -> cfg.zakljucanaEkspozicijaNs
+            else -> 0L
+        }
+        val trazeniIso = when {
+            cfg.rucnaEkspozicija -> cfg.iso
+            cfg.zakljucaniIso > 0 -> cfg.zakljucaniIso
+            else -> 0
+        }
+
+        if (trazenaEkspozicija > 0 && rucnoMoguce) {
             val raspon = c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
             val isoRaspon = c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
-            val vreme = raspon?.clamp(cfg.ekspozicijaNs) ?: cfg.ekspozicijaNs
-            val osetljivost = isoRaspon?.clamp(cfg.iso) ?: cfg.iso
+            val vreme = raspon?.clamp(trazenaEkspozicija) ?: trazenaEkspozicija
+            val osetljivost = isoRaspon?.clamp(trazeniIso) ?: trazeniIso
+
+            // Scene rezim i HDR umeju da nadglasaju rucne vrednosti: telefon
+            // primi zahtev, ne prijavi gresku, i snimi po svome.
+            zahtev.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
+            zahtev.set(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_DISABLED)
             zahtev.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+            zahtev.set(CaptureRequest.CONTROL_AE_LOCK, false)
             zahtev.set(CaptureRequest.SENSOR_EXPOSURE_TIME, vreme)
             zahtev.set(CaptureRequest.SENSOR_SENSITIVITY, osetljivost)
-            zahtev.set(CaptureRequest.SENSOR_FRAME_DURATION, vreme)
+
+            // Duzina kadra ne sme biti kraca od ekspozicije, inace je senzor
+            // preseca. Uzima se veca od dve, uz gornju granicu uredjaja.
+            val najduzi = c.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION) ?: vreme
+            zahtev.set(CaptureRequest.SENSOR_FRAME_DURATION, minOf(maxOf(vreme, 33_333_333L), najduzi))
         } else {
             zahtev.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
         }

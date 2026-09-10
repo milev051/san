@@ -92,11 +92,25 @@ class Snimanje : Service() {
         val sada = System.currentTimeMillis()
         cfg.razlogPrekida = ""
         cfg.aktivno = true
-        cfg.pocetak = sada
-        cfg.brojSlika = 0
-        cfg.prethodnaSlicica = null
         cfg.poslednjaGreska = ""
-        nocDatum = Raspored.nocDatum(sada)
+
+        // Kratak prekid je nastavak iste noci, ne nova noc. Ustao si do
+        // kupatila i vratio se: isti folder, isto brojanje, ista zakljucana
+        // ekspozicija, pa slike ostaju uporedive. Posle osam sati je to vec
+        // sledeci san.
+        val nastavak = cfg.tekucaNoc.isNotBlank() &&
+                Raspored.nastavakIste(sada, cfg.poslednjaSlika, Config.NASTAVAK_MS)
+        if (nastavak) {
+            nocDatum = LocalDate.parse(cfg.tekucaNoc)
+        } else {
+            nocDatum = Raspored.nocDatum(sada)
+            cfg.tekucaNoc = nocDatum.toString()
+            cfg.pocetak = sada
+            cfg.brojSlika = 0
+            cfg.prethodnaSlicica = null
+            cfg.zakljucanaEkspozicijaNs = 0
+            cfg.zakljucaniIso = 0
+        }
         drziBudnim(true)
         // Prva slika ide odmah, ne na sledecu tacku mreze. Sa razmakom od sat
         // vremena bi se inace do prve potvrde cekalo sat vremena, a poenta
@@ -116,6 +130,16 @@ class Snimanje : Service() {
             cfg.poslednjaGreska = "nema mesta na telefonu"
             Zvuk.greska(this, cfg)
             stani("nema mesta")
+            return
+        }
+
+        // Telefon visi kod plafona i najcesce nije na punjacu. Ugasen telefon
+        // ne zavrsi zapisnik i ne izvezе noc, pa se staje dok jos ima struje.
+        val napunjenost = baterija()
+        if (napunjenost in 0..cfg.pragBaterije) {
+            cfg.poslednjaGreska = "baterija na $napunjenost odsto"
+            Zvuk.greska(this, cfg)
+            stani("baterija na $napunjenost odsto")
             return
         }
 
@@ -141,8 +165,24 @@ class Snimanje : Service() {
             Zvuk.greska(this, cfg)
         } else {
             cfg.brojSlika = redni
+            cfg.poslednjaSlika = vreme
             cfg.poslednjaGreska = ""
-            zapisnik.dodaj(vreme, ishod.ime, ishod.pokret, cfg.razmakMin)
+            zapisnik.dodaj(
+                vreme, ishod.ime, ishod.pokret, cfg.razmakMin,
+                uri = ishod.uri, ekspozicijaNs = ishod.ekspozicijaNs, iso = ishod.iso,
+            )
+
+            // Zakljucavanje posle prve slike: automatika jednom odredi
+            // ekspoziciju, procita se sta je stvarno upotrebila, i ostatak noci
+            // se snima tim istim vrednostima. Bez toga automatika u mraku luta
+            // od kadra do kadra i merenje pokreta poredi neuporedivo.
+            if (cfg.zakljucajPosleParve && !cfg.rucnaEkspozicija &&
+                cfg.zakljucanaEkspozicijaNs == 0L && ishod.ekspozicijaNs > 0 && ishod.iso > 0
+            ) {
+                cfg.zakljucanaEkspozicijaNs = ishod.ekspozicijaNs
+                cfg.zakljucaniIso = ishod.iso
+            }
+
             if (cfg.zvuk && (redni <= 2 || cfg.zvukSvaka)) Zvuk.potvrda(this, cfg)
         }
 
@@ -155,11 +195,26 @@ class Snimanje : Service() {
         prijaviSe(tekstStanja())
     }
 
+    /**
+     * Zapisnik se cuva uz male kopije, u privatnom folderu aplikacije.
+     *
+     * Ranije je isao u `Documents` posle svake dvanaeste slike, ali je tamo
+     * pravio drugi album u galeriji. Na racunar se noc prebacuje dugmetom
+     * „Izvezi", iz aplikacije.
+     */
     private fun izveziZapisnik(zapisnik: Noc) {
-        Zapis.sacuvajTekst(
-            this, zapisnik.tekst(),
-            Zapis.putanjaAnaliza(Raspored.putanjaNoci(nocDatum)), "noc.json",
-        )
+        try {
+            java.io.File(Obrada.folderNoci(this, nocDatum.toString()), "noc.json")
+                .writeText(zapisnik.tekst())
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun baterija(): Int = try {
+        (getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager)
+            .getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    } catch (e: Exception) {
+        -1
     }
 
     private fun stani(razlog: String) {

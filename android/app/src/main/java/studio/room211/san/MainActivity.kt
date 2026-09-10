@@ -51,6 +51,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var probaOpis: TextView
     private lateinit var probaSlika: ImageView
     private lateinit var brojSlikaOpis: TextView
+    private lateinit var pocniDugme: com.google.android.material.button.MaterialButton
+    private lateinit var stopDugme: com.google.android.material.button.MaterialButton
+    private lateinit var poslednja: ImageView
     private val posao = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,34 +97,60 @@ class MainActivity : AppCompatActivity() {
         val (kartica, sadrzaj) = card(this, "Snimanje")
         stanje = body(this, "")
         sadrzaj.addView(stanje)
-        sadrzaj.addView(button(this, "Počni") {
+
+        pocniDugme = button(this, "Počni") {
             if (!imaKameru()) { trraziDozvole(); return@button }
             Snimanje.pokreni(this)
             stanje.postDelayed({ osvezi() }, 2500)
-        })
-        sadrzaj.addView(button(this, "Zaustavi") {
+        }
+        // Dugme „Zaustavi" postoji samo dok ima šta da se zaustavi. Isto važi i
+        // obrnuto, pa se ne može dvaput pokrenuti isto snimanje.
+        stopDugme = button(this, "Zaustavi") {
             Snimanje.zaustavi(this)
             stanje.postDelayed({ osvezi() }, 600)
-        })
+        }
+        sadrzaj.addView(pocniDugme)
+        sadrzaj.addView(stopDugme)
+
+        poslednja = ImageView(this).apply {
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(220)
+            ).apply { topMargin = dp(8) }
+        }
+        sadrzaj.addView(poslednja)
+        sadrzaj.addView(button(this, "Snimljene noći") { Noci.otvori(this) })
         return kartica
     }
 
     private fun osvezi() {
+        pocniDugme.visibility = if (cfg.aktivno) android.view.View.GONE else android.view.View.VISIBLE
+        stopDugme.visibility = if (cfg.aktivno) android.view.View.VISIBLE else android.view.View.GONE
+
         val redovi = ArrayList<String>()
         if (cfg.aktivno) {
-            redovi.add("Snima od ${vremeTekst(cfg.pocetak)}, noć ${Raspored.nocDatum(cfg.pocetak)}")
+            redovi.add("Snima od ${vremeTekst(cfg.pocetak)}, noć ${cfg.tekucaNoc}")
             redovi.add("Slika do sada: ${cfg.brojSlika}")
             if (cfg.sledece > 0) redovi.add("Sledeća u ${vremeTekst(cfg.sledece)}")
+            if (cfg.zakljucanaEkspozicijaNs > 0) {
+                redovi.add("Zaključano: ${Kamera.Sposobnosti.vremeTekst(cfg.zakljucanaEkspozicijaNs)}, " +
+                        "ISO ${cfg.zakljucaniIso}")
+            }
         } else {
             redovi.add("Zaustavljeno")
-            val poslednja = Noc.spisak(this).firstOrNull()
-            if (poslednja != null) {
-                val zapisnik = Noc(this, poslednja).ucitaj()
-                redovi.add("Poslednja noć $poslednja: ${zapisnik.optInt("ukupno")} slika")
+            val poslednjaNoc = Noci.spisak(this).firstOrNull()
+            if (poslednjaNoc != null) {
+                val zapisnik = Noci.zapisnik(this, poslednjaNoc)
+                redovi.add("Poslednja noć $poslednjaNoc: ${zapisnik.optInt("ukupno")} slika")
+                if (nastavakMoguc()) {
+                    redovi.add("Novo pokretanje nastavlja tu noć, isti folder i isto brojanje")
+                }
             }
         }
+        redovi.add("Baterija: ${baterija()}%" + if (naPunjacu()) ", na punjaču" else "")
         redovi.add("Slobodno: ${gigabajti(Zapis.slobodno())}")
-        if (!naPunjacu()) redovi.add("Telefon NIJE na punjaču")
+        prikaziPoslednju()
         if (cfg.poslednjaGreska.isNotBlank()) redovi.add("Greška: ${cfg.poslednjaGreska}")
         if (!cfg.aktivno && cfg.razlogPrekida.isNotBlank()) {
             redovi.add("Prekinuto: ${cfg.razlogPrekida}")
@@ -130,6 +159,27 @@ class MainActivity : AppCompatActivity() {
         provera.text = tekstProvere()
         brojSlikaOpis.text = opisRazmaka()
     }
+
+    /** Poslednja snimljena slika tekuće noći, da se vidi šta kamera stvarno vidi. */
+    private fun prikaziPoslednju() {
+        val noc = cfg.tekucaNoc.ifBlank { Noci.spisak(this).firstOrNull() ?: "" }
+        val fajl = if (noc.isBlank()) null else Noci.slike(this, noc).lastOrNull()
+        if (fajl == null) {
+            poslednja.setImageDrawable(null)
+            poslednja.visibility = android.view.View.GONE
+        } else {
+            poslednja.visibility = android.view.View.VISIBLE
+            poslednja.setImageBitmap(
+                BitmapFactory.decodeFile(fajl.absolutePath, BitmapFactory.Options().apply {
+                    inSampleSize = 2
+                })
+            )
+        }
+    }
+
+    private fun nastavakMoguc(): Boolean = Raspored.nastavakIste(
+        System.currentTimeMillis(), cfg.poslednjaSlika, Config.NASTAVAK_MS
+    )
 
     // ------------------------------------------------------------ noćna proba
 
@@ -169,9 +219,11 @@ class MainActivity : AppCompatActivity() {
                 opis.append(sposobnosti?.opis() ?: "Kamera nije dostupna")
                 opis.append("\nSnimak je trajao ${trajalo / 1000.0}s")
                 if (ishod.bajtovi != null) {
-                    val slika = BitmapFactory.decodeByteArray(ishod.bajtovi, 0, ishod.bajtovi.size)
-                    probaSlika.setImageBitmap(slika)
+                    // Uspravno, isto kao što će biti sačuvano. `BitmapFactory`
+                    // ne gleda EXIF, pa je slika ovde ranije stajala bočno.
+                    probaSlika.setImageBitmap(Slika.uspravno(ishod.bajtovi, 1600))
                     opis.append("\nVeličina: ${ishod.bajtovi.size / 1024} KB")
+                    opis.append("\n\n").append(uporediTrazeno(ishod))
                 } else {
                     probaSlika.setImageDrawable(null)
                     opis.append("\nSnimak nije uspeo: ${ishod.greska}")
@@ -179,6 +231,39 @@ class MainActivity : AppCompatActivity() {
                 probaOpis.text = opis.toString()
             }
         }
+    }
+
+    /**
+     * Šta je traženo, a šta je senzor stvarno upotrebio.
+     *
+     * Ovo je jedini način da se vidi da telefon odbija traženu ekspoziciju.
+     * Granica se razlikuje od modela do modela, pa se svaka vrednost iznad nje
+     * tiho stegne na istu, i izgleda kao da podešavanje ne radi.
+     */
+    private fun uporediTrazeno(ishod: Kamera.Rezultat): String {
+        val redovi = ArrayList<String>()
+        val trazeno = when {
+            cfg.rucnaEkspozicija -> cfg.ekspozicijaNs
+            cfg.zakljucanaEkspozicijaNs > 0 -> cfg.zakljucanaEkspozicijaNs
+            else -> 0L
+        }
+        if (ishod.ekspozicijaNs > 0) {
+            redovi.add("Dobijeno: ${Kamera.Sposobnosti.vremeTekst(ishod.ekspozicijaNs)}, ISO ${ishod.iso}")
+        }
+        if (trazeno > 0) {
+            redovi.add("Traženo: ${Kamera.Sposobnosti.vremeTekst(trazeno)}, ISO ${cfg.iso}")
+            if (!ishod.rucnoPrimenjeno) {
+                redovi.add("UPOZORENJE: telefon je snimao automatikom, ručne vrednosti nisu primenjene.")
+            } else if (ishod.ekspozicijaNs > 0 &&
+                kotlin.math.abs(ishod.ekspozicijaNs - trazeno) > trazeno / 10
+            ) {
+                redovi.add("UPOZORENJE: telefon je traženu ekspoziciju stegao na svoju granicu. " +
+                        "Traži vrednost unutar raspona ispisanog gore.")
+            }
+        } else {
+            redovi.add("Režim: automatika")
+        }
+        return redovi.joinToString("\n")
     }
 
     // ---------------------------------------------------------------- razmak
@@ -231,11 +316,17 @@ class MainActivity : AppCompatActivity() {
         sadrzaj.addView(body(this, "Na kopiji koja ide modelu vreme se upisuje uvek, jer je " +
                 "tamo jedino sidro za redosled."))
 
+        sadrzaj.addView(switch(this, "Zaključaj ekspoziciju posle prve slike",
+            cfg.zakljucajPosleParve) { cfg.zakljucajPosleParve = it })
+        sadrzaj.addView(body(this, "Prva slika se snimi automatikom, iz nje se pročita koju je " +
+                "ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide tim vrednostima. " +
+                "Tako su sve slike uporedive, a ne moraš da pogađaš brojeve."))
+
         sadrzaj.addView(switch(this, "Ručna ekspozicija", cfg.rucnaEkspozicija) {
             cfg.rucnaEkspozicija = it
         })
-        sadrzaj.addView(body(this, "Automatika u mraku luta: jedna slika crna, sledeća " +
-                "prosvetljena. Zaključane vrednosti čine sve slike jedne noći uporedivim."))
+        sadrzaj.addView(body(this, "Ručne vrednosti imaju prednost nad zaključanim. Ako ih telefon " +
+                "ne prihvati, Noćna proba to kaže: ispisuje i traženo i dobijeno."))
 
         sadrzaj.addView(field(this, "Ekspozicija, 1/x sekunde", ekspozicijaTekst()) { uneto ->
             uneto.toIntOrNull()?.let { if (it > 0) cfg.ekspozicijaNs = 1_000_000_000L / it }
@@ -269,6 +360,12 @@ class MainActivity : AppCompatActivity() {
             cfg.zvukSvaka = it
         })
         sadrzaj.addView(button(this, "Čuj kako zvuči") { Zvuk.potvrda(this, cfg) })
+        sadrzaj.addView(field(this, "Prekini kad baterija padne na, u odsto",
+            cfg.pragBaterije.toString()) { uneto ->
+            uneto.toIntOrNull()?.let { cfg.pragBaterije = it }
+        }.first)
+        sadrzaj.addView(body(this, "Ugašen telefon ne završi zapisnik i ne izveze noć, pa se staje " +
+                "dok još ima struje. Snimanje bez punjača troši oko 5 do 10 odsto po satu."))
         sadrzaj.addView(field(this, "Sam prekini u sat (prazno = nikad)",
             if (cfg.autoStopSat in 0..23) cfg.autoStopSat.toString() else "") { uneto ->
             cfg.autoStopSat = uneto.toIntOrNull()?.takeIf { it in 0..23 } ?: -1
@@ -291,6 +388,16 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
             }
         })
+        sadrzaj.addView(button(this, "Očisti stare kopije iz Documents") {
+            val obrisano = Zapis.obrisiIzvoz(this)
+            android.widget.Toast.makeText(
+                this, "Obrisano $obrisano fajlova iz Documents/San",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        })
+        sadrzaj.addView(body(this, "Verzija 0.1 je male kopije upisivala u Documents posle svake " +
+                "slike, pa je galerija prikazivala dva albuma istog imena sa istim slikama. " +
+                "Ovim se ti stari fajlovi brišu; pune slike u galeriji ostaju netaknute."))
         sadrzaj.addView(button(this, "Štednja baterije") {
             startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
         })
@@ -346,6 +453,13 @@ class MainActivity : AppCompatActivity() {
     private fun naPunjacu(): Boolean {
         val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         return bm.isCharging
+    }
+
+    private fun baterija(): Int = try {
+        (getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
+            .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    } catch (e: Exception) {
+        -1
     }
 
     private fun vremeTekst(vreme: Long): String =

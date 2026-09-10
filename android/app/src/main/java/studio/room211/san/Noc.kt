@@ -21,7 +21,16 @@ class Noc(private val ctx: Context, val datum: String) {
 
     private val fajl = File(File(ctx.filesDir, "noci").apply { mkdirs() }, "$datum.json")
 
-    fun dodaj(vreme: Long, ime: String, pokret: Double, razmakMin: Int, greska: String = "") {
+    fun dodaj(
+        vreme: Long,
+        ime: String,
+        pokret: Double,
+        razmakMin: Int,
+        greska: String = "",
+        uri: String = "",
+        ekspozicijaNs: Long = 0,
+        iso: Int = 0,
+    ) {
         val koren = ucitaj()
         koren.put("noc", datum)
         koren.put("razmak_min", razmakMin)
@@ -35,6 +44,9 @@ class Noc(private val ctx: Context, val datum: String) {
             put("fajl", ime)
             put("pokret", String.format(java.util.Locale.US, "%.4f", pokret).toDouble())
             put("promena", pokret >= Pokret.PRAG)
+            if (uri.isNotBlank()) put("uri", uri)
+            if (ekspozicijaNs > 0) put("ekspozicija_ns", ekspozicijaNs)
+            if (iso > 0) put("iso", iso)
             if (greska.isNotBlank()) put("greska", greska)
         })
         koren.put("slike", redovi)

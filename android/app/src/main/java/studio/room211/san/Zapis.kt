@@ -51,10 +51,11 @@ object Zapis {
         relativna: String,
         ime: String,
         vreme: Long,
+        uspravna: Boolean = false,
     ): Uri? {
         val uri = upisi(ctx, bajtovi, relativna, ime, "image/jpeg", MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             ?: return null
-        upisiExif(ctx, uri, vreme)
+        upisiExif(ctx, uri, vreme, uspravna)
         return uri
     }
 
@@ -62,21 +63,21 @@ object Zapis {
         upisi(ctx, tekst.toByteArray(), relativna, ime, "application/json", filesUri())
 
     /**
-     * Smanjena kopija za analizu. Ide u `Documents`, ne u galeriju.
+     * Izvezi malu kopiju noci u `Documents`, za prenos na racunar.
      *
-     * U galeriji bi napravila drugi album sa istim slikama, pa bi svako
-     * listanje telefona pokazalo svaku noc dvaput.
+     * Radi se na zahtev, ne posle svake slike. Kad je islo automatski, galerija
+     * je prikazivala dva albuma istog imena sa istim slikama: jedan iz DCIM-a,
+     * drugi iz Documents-a. Uz izvoz se upisuje i `.nomedia`, da se to ne
+     * ponovi ni kad je folder tu.
      */
-    fun sacuvajKopiju(
-        ctx: Context,
-        bajtovi: ByteArray,
-        relativna: String,
-        ime: String,
-        vreme: Long,
-    ): Uri? {
-        val uri = upisi(ctx, bajtovi, relativna, ime, "image/jpeg", filesUri()) ?: return null
-        upisiExif(ctx, uri, vreme)
-        return uri
+    fun izveziNoc(ctx: Context, folder: File, relativna: String): Int {
+        var upisano = 0
+        upisi(ctx, ByteArray(0), relativna, ".nomedia", "application/octet-stream", filesUri())
+        for (fajl in folder.listFiles()?.sortedBy { it.name } ?: emptyList()) {
+            val tip = if (fajl.name.endsWith(".json")) "application/json" else "image/jpeg"
+            if (upisi(ctx, fajl.readBytes(), relativna, fajl.name, tip, filesUri()) != null) upisano++
+        }
+        return upisano
     }
 
     private fun filesUri(): Uri =
@@ -127,6 +128,23 @@ object Zapis {
         }
     }
 
+    /**
+     * Obrisi sve sto je aplikacija upisala u `Documents/San/`.
+     *
+     * Postoji zbog greske iz verzije 0.1: male kopije su isle u `Documents`
+     * posle svake slike, pa je galerija pokazivala dva albuma istog imena sa
+     * istim slikama. Pune slike u DCIM-u se ne diraju.
+     */
+    fun obrisiIzvoz(ctx: Context): Int = try {
+        ctx.contentResolver.delete(
+            filesUri(),
+            "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+            arrayOf("${Environment.DIRECTORY_DOCUMENTS}/$KOREN/%"),
+        )
+    } catch (e: Exception) {
+        0
+    }
+
     private fun obrisiPostojeci(ctx: Context, zbirka: Uri, relativna: String, ime: String) {
         try {
             ctx.contentResolver.delete(
@@ -146,7 +164,7 @@ object Zapis {
      * na sliku upise traka sa vremenom, slika se iznova kodira i originalni
      * EXIF nestane, pa se mora vratiti rukom.
      */
-    private fun upisiExif(ctx: Context, uri: Uri, vreme: Long) {
+    private fun upisiExif(ctx: Context, uri: Uri, vreme: Long, uspravna: Boolean = false) {
         try {
             ctx.contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
                 val exif = ExifInterface(pfd.fileDescriptor)
@@ -154,6 +172,14 @@ object Zapis {
                 exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, oblik)
                 exif.setAttribute(ExifInterface.TAG_DATETIME, oblik)
                 exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, oblik)
+                // Slika sa upisanim vremenom je vec okrenuta u pikselima. Da
+                // ostane stara oznaka, galerija bi je okrenula jos jednom.
+                if (uspravna) {
+                    exif.setAttribute(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL.toString(),
+                    )
+                }
                 exif.saveAttributes()
             }
         } catch (e: Exception) {

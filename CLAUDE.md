@@ -18,6 +18,22 @@ Telefon samo snima i meri pokret; zaključivanje je posao računara.
 
 ## Pravila koja se ne smeju prekršiti
 
+**Kamera ne okreće piksele, nego upisuje ugao u EXIF.** Galerija to poštuje,
+`BitmapFactory` ne. Zato slika u aplikaciji izgleda položeno. Važnije: kad se
+na sliku upisuje vreme, slika se iznova kodira i EXIF nestane, pa bi traka bila
+nacrtana bočno i takva ostala zauvek. Okretanje se primenjuje na piksele u
+`Slika.uspravno`, PRE crtanja trake, a gotova slika dobija uspravnu oznaku.
+
+**Tražena ekspozicija nije dobijena ekspozicija.** Granica se razlikuje od
+modela do modela; sve iznad nje telefon tiho stegne na svoju vrednost, bez
+greške, pa izgleda kao da podešavanje ne radi. Zato se iz `CaptureResult` čita
+šta je senzor STVARNO upotrebio, i „Noćna proba" ispisuje i traženo i dobijeno.
+
+**Male kopije ne smeju u `Documents` automatski.** Galerija tada prikazuje dva
+albuma istog imena sa istim slikama, jedan iz DCIM-a i jedan iz Documents-a.
+Male kopije žive u privatnom folderu aplikacije, a u `Documents` ih prebacuje
+dugme „Izvezi za računar", uz `.nomedia`.
+
 **Pokret se meri PRE nego što se na sliku upiše vreme.** Traka sa vremenom se
 menja na svakoj slici. Ko izmeri razliku posle upisa, dobije da se svaki kadar
 promenio, pa je ceo grafikon noći smeće, izbor kadrova za model besmislen, a
@@ -37,6 +53,12 @@ Bez toga se svaka noć iseče na dva foldera u ponoć.
 **Na slici piše STVARNI datum kadra, ne datum noći.** Slika u 03:45 stoji u
 folderu `2026-09-10` a nosi `2026-09-11`. Da piše datum noći, model bi u redove
 upisao vreme koje ne postoji, i to bi izgledalo uredno.
+
+**Kratak prekid je nastavak iste noći, ne nova noć.** Granica je osam sati od
+POSLEDNJE SLIKE, ne od zaustavljanja. Ustao do kupatila i vratio se: isti
+folder, isto brojanje, ista zaključana ekspozicija. `Raspored.nastavakIste`
+odbija i negativnu razliku, jer telefon ume da pomeri sat unazad, a razlika
+manja od granice bi tada nastavila noć koja se još nije desila.
 
 **Kamera se otvara samo za snimak pa zatvara.** Otvorena cele noći greje telefon
 i troši bateriju osam sati zbog posla koji traje sekundu.
@@ -104,6 +126,11 @@ primeti tek kad se dva izlaza ne poklope.
 | Isti fajl upisan bez brisanja | `noc (1).json`, `noc (2).json`, … | brisanje pa upis |
 | Pad kad `startForeground` ne prođe | noć stane u tri ujutru bez traga | uhvaćen izuzetak i upisan `razlogPrekida` |
 | Puna slika dekodirana u ARGB_8888 bez rezerve | 48 MB po kadru, `OutOfMemory` | pokušaj ARGB, pa RGB_565, pa original bez trake |
+| `BitmapFactory` bez EXIF ugla | probna slika položena, a traka sa vremenom nacrtana bočno i zapečena u sliku | `Slika.uspravno` pre crtanja, uspravna oznaka pri upisu |
+| Male kopije upisivane u `Documents` posle svake slike | dva albuma istog imena sa istim slikama u galeriji | privatni folder, izvoz na dugme; `Zapis.obrisiIzvoz` čisti staro |
+| `SENSOR_EXPOSURE_TIME` bez čitanja `CaptureResult` | tražena vrednost stegnuta na granicu uređaja, izgleda kao da podešavanje ne radi | pročitaj i prikaži dobijeno pored traženog |
+| `SENSOR_FRAME_DURATION` kraće od ekspozicije | senzor preseca ekspoziciju | veće od dva, uz `SENSOR_INFO_MAX_FRAME_DURATION` |
+| `strings \| grep -q` uz `pipefail` u `objavi.sh` | `grep` izađe na prvom pogotku, `strings` dobije SIGPIPE, skripta odbije ispravan APK | stringovi u fajl pa `grep -F` nad fajlom |
 
 ---
 
@@ -186,7 +213,7 @@ Redosled i razlozi su u `FUNKCIJE.md`, tačka 13.
 
 | | |
 |---|---|
-| Pregled noći u aplikaciji | sličice, filmska traka, grafikon pokreta |
+| Filmska traka i grafikon pokreta | mreža sličica postoji od 0.2, ostalo ne |
 | Označavanje položaja prstom | ujutru, samo kadrovi sa promenom; iz toga izlazi etalon |
 | Automatsko brisanje starih noći | i sažimanje u ubrzani snimak posle sedam dana |
 | Sinhronizacija dva telefona | Bonjour i token, prepisati iz `most/` |

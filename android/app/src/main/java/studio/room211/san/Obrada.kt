@@ -2,8 +2,8 @@ package studio.room211.san
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.time.LocalDate
 
 /**
@@ -12,10 +12,26 @@ import java.time.LocalDate
  * Redosled u ovoj datoteci nije proizvoljan: pokret se meri PRE nego sto se na
  * sliku upise vreme. Traka sa vremenom se menja na svakom kadru, pa bi merenje
  * inace na svakoj slici videlo promenu i ceo grafikon noci bio bi smece.
+ *
+ * Mala kopija ide u privatni folder aplikacije, ne u `Documents`. U `Documents`
+ * je pravila drugi album u galeriji, sa istim imenom i istim slikama kao onaj
+ * u DCIM-u; iz aplikacije se izvozi tek kad se noc prebacuje na racunar.
  */
 object Obrada {
 
-    class Ishod(val ime: String, val pokret: Double, val greska: String)
+    class Ishod(
+        val ime: String,
+        val pokret: Double,
+        val greska: String,
+        val ekspozicijaNs: Long = 0,
+        val iso: Int = 0,
+        val rucnoPrimenjeno: Boolean = false,
+        val uri: String = "",
+    )
+
+    /** Folder sa malim kopijama jedne noci, unutar aplikacije. */
+    fun folderNoci(ctx: Context, noc: String): File =
+        File(File(ctx.filesDir, "analiza"), noc).apply { mkdirs() }
 
     fun jednaSlika(
         ctx: Context,
@@ -33,10 +49,10 @@ object Obrada {
         val putanja = Raspored.putanjaNoci(nocDatum)
         val zigTekst = Raspored.zigTekst(vreme, redni)
 
-        // Mala kopija: iz nje se meri pokret i ona ide modelu. Puna slika se
-        // zbog toga ne mora drzati u memoriji dva puta.
-        val mala = smanji(sirovo, Config.ANALIZA_STRANA)
+        // Mala kopija: iz nje se meri pokret, ona se prikazuje u aplikaciji i
+        // ona ide modelu. Puna slika se zbog toga ne drzi u memoriji dvaput.
         var pokret = 0.0
+        val mala = Slika.uspravno(sirovo, Config.ANALIZA_STRANA)
         if (mala != null) {
             val slicica = Zig.slicica(mala)
             cfg.prethodnaSlicica?.let { pre ->
@@ -45,73 +61,34 @@ object Obrada {
             cfg.prethodnaSlicica = slicica
 
             Zig.upisi(mala, zigTekst)
-            Zapis.sacuvajKopiju(
-                ctx, uJpeg(mala, 85), Zapis.putanjaAnaliza(putanja), ime, vreme
-            )
+            try {
+                File(folderNoci(ctx, nocDatum.toString()), ime).writeBytes(uJpeg(mala, 85))
+            } catch (e: Exception) {
+                // Mala kopija je dodatak; puna slika je ono sto se ne sme izgubiti.
+            }
             mala.recycle()
         }
 
-        val zaArhivu = if (cfg.zigNaArhivi) saZigom(sirovo, zigTekst, cfg.kvalitet) ?: sirovo else sirovo
-        Zapis.sacuvajSliku(ctx, zaArhivu, Zapis.putanjaSlika(putanja), ime, vreme)
-            ?: return Ishod(ime, pokret, "upis u DCIM nije uspeo")
-
-        return Ishod(ime, pokret, "")
-    }
-
-    /** Puna slika sa upisanim vremenom. `null` znaci da se cuva original, netaknut. */
-    private fun saZigom(sirovo: ByteArray, tekst: String, kvalitet: Int): ByteArray? {
-        for (konfiguracija in listOf(Bitmap.Config.ARGB_8888, Bitmap.Config.RGB_565)) {
-            try {
-                val opcije = BitmapFactory.Options().apply {
-                    inPreferredConfig = konfiguracija
-                    inMutable = true
-                }
-                val slika = BitmapFactory.decodeByteArray(sirovo, 0, sirovo.size, opcije)
-                    ?: return null
-                Zig.upisi(slika, tekst)
-                val izlaz = uJpeg(slika, kvalitet)
-                slika.recycle()
-                return izlaz
-            } catch (e: OutOfMemoryError) {
-                // Puna slika od 12 MP je 48 MB u memoriji. Ako ne stane, ide se
-                // na upola manji zapis, pa tek onda na original bez trake.
-            } catch (e: Exception) {
-                return null
+        var okrenuto = false
+        val zaArhivu = if (cfg.zigNaArhivi) {
+            val puna = Slika.uspravno(sirovo)
+            if (puna == null) sirovo else {
+                Zig.upisi(puna, zigTekst)
+                val izlaz = uJpeg(puna, cfg.kvalitet)
+                puna.recycle()
+                okrenuto = true
+                izlaz
             }
-        }
-        return null
-    }
+        } else sirovo
 
-    private fun smanji(sirovo: ByteArray, duzaStrana: Int): Bitmap? {
-        return try {
-            val mere = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(sirovo, 0, sirovo.size, mere)
-            val veca = maxOf(mere.outWidth, mere.outHeight)
-            if (veca <= 0) return null
+        val uri = Zapis.sacuvajSliku(
+            ctx, zaArhivu, Zapis.putanjaSlika(putanja), ime, vreme, uspravna = okrenuto
+        ) ?: return Ishod(ime, pokret, "upis u DCIM nije uspeo")
 
-            var uzorak = 1
-            while (veca / (uzorak * 2) >= duzaStrana) uzorak *= 2
-
-            val opcije = BitmapFactory.Options().apply {
-                inSampleSize = uzorak
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-                inMutable = true
-            }
-            val slika = BitmapFactory.decodeByteArray(sirovo, 0, sirovo.size, opcije) ?: return null
-            val trenutna = maxOf(slika.width, slika.height)
-            if (trenutna <= duzaStrana) return slika
-
-            val odnos = duzaStrana.toFloat() / trenutna
-            val skalirana = Bitmap.createScaledBitmap(
-                slika, (slika.width * odnos).toInt(), (slika.height * odnos).toInt(), true
-            )
-            if (skalirana !== slika) slika.recycle()
-            skalirana
-        } catch (e: OutOfMemoryError) {
-            null
-        } catch (e: Exception) {
-            null
-        }
+        return Ishod(
+            ime, pokret, "",
+            snimak.ekspozicijaNs, snimak.iso, snimak.rucnoPrimenjeno, uri.toString(),
+        )
     }
 
     private fun uJpeg(slika: Bitmap, kvalitet: Int): ByteArray {

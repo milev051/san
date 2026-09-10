@@ -93,6 +93,48 @@ class LogikaTest {
         assertEquals(160, Raspored.slikaZaNoc(3))
     }
 
+    // -------------------------------------------------------------- nastavak
+
+    private val osamSati = 8 * 3600_000L
+
+    @Test
+    fun `kratak prekid nastavlja istu noc`() {
+        val poslednja = ms("2026-09-11T02:00:00")
+        // Ustao do kupatila, zaustavio, vratio se posle deset minuta.
+        assertTrue(Raspored.nastavakIste(ms("2026-09-11T02:10:00"), poslednja, osamSati))
+        assertTrue(Raspored.nastavakIste(ms("2026-09-11T09:59:00"), poslednja, osamSati))
+    }
+
+    @Test
+    fun `posle osam sati pocinje nova noc`() {
+        val poslednja = ms("2026-09-11T02:00:00")
+        assertTrue(!Raspored.nastavakIste(ms("2026-09-11T10:00:00"), poslednja, osamSati))
+        assertTrue(!Raspored.nastavakIste(ms("2026-09-11T22:00:00"), poslednja, osamSati))
+    }
+
+    @Test
+    fun `bez ijedne prethodne slike nema sta da se nastavi`() {
+        assertTrue(!Raspored.nastavakIste(ms("2026-09-11T02:10:00"), 0, osamSati))
+    }
+
+    @Test
+    fun `sat pomeren unazad ne pravi nastavak iz buducnosti`() {
+        // Telefon uskladi sat i vrati ga minut unazad; bez ovog uslova bi
+        // razlika bila negativna, dakle „manja od granice", pa bi se nastavila
+        // noc koja se jos nije desila.
+        assertTrue(!Raspored.nastavakIste(ms("2026-09-11T01:59:00"), ms("2026-09-11T02:00:00"), osamSati))
+    }
+
+    @Test
+    fun `noc pokrenuta u deset uvece drzi isti folder do deset ujutru`() {
+        val pocetak = ms("2026-09-10T22:00:00")
+        val noc = Raspored.nocDatum(pocetak, zona)
+        // Folder se odredjuje jednom, na pocetku, pa kadar u 10:00 narednog
+        // dana i dalje pripada istoj noci.
+        assertEquals(LocalDate.parse("2026-09-10"), noc)
+        assertTrue(Raspored.nastavakIste(ms("2026-09-11T10:00:00"), ms("2026-09-11T09:55:00"), osamSati))
+    }
+
     // ---------------------------------------------------------------- pokret
 
     @Test
