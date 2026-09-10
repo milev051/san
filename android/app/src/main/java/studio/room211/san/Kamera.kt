@@ -35,6 +35,8 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
     data class Sposobnosti(
         val id: String,
         val nivo: String,
+        val strana: String = "",
+        val rezimi: List<String> = emptyList(),
         val rucnaMoguca: Boolean,
         val ekspozicija: Range<Long>?,
         val iso: Range<Int>?,
@@ -46,8 +48,11 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
             val raspon = if (e == null) "nepoznato" else
                 "${vremeTekst(e.lower)} do ${vremeTekst(e.upper)}"
             val najveca = velicine.firstOrNull()
+            val nocni = if (rezimi.any { it == "noćni" }) "IMA noćni režim"
+            else "nema noćni režim" + if (rezimi.isEmpty()) "" else " (${rezimi.joinToString(", ")})"
             return buildString {
-                append("Kamera $id, nivo $nivo\n")
+                append("Kamera $id ($strana), nivo $nivo\n")
+                append("$nocni\n")
                 append("Ekspozicija: $raspon\n")
                 append("ISO: ${iso?.lower ?: "?"} do ${iso?.upper ?: "?"}\n")
                 append("Najveca slika: ${najveca?.width ?: 0}x${najveca?.height ?: 0}\n")
@@ -67,6 +72,11 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
     private val manager = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
     fun idKamere(): String? {
+        // Izabrana kamera ima prednost; ako je nema (druga aplikacija, druga
+        // verzija sistema), pada se na izbor po strani umesto na gresku.
+        val izabrana = cfg.kameraId
+        if (izabrana.isNotBlank() && manager.cameraIdList.contains(izabrana)) return izabrana
+
         val trazeno = if (cfg.prednjaKamera) CameraCharacteristics.LENS_FACING_FRONT
         else CameraCharacteristics.LENS_FACING_BACK
         return manager.cameraIdList.firstOrNull {
@@ -74,8 +84,17 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         } ?: manager.cameraIdList.firstOrNull()
     }
 
+    /** Sve kamere telefona, sa onim po cemu se ovde razlikuju. */
+    fun sveKamere(): List<Sposobnosti> = manager.cameraIdList.mapNotNull { id ->
+        try { sposobnosti(id) } catch (e: Exception) { null }
+    }
+
     fun sposobnosti(): Sposobnosti? {
         val id = idKamere() ?: return null
+        return sposobnosti(id)
+    }
+
+    fun sposobnosti(id: String): Sposobnosti? {
         val c = manager.getCameraCharacteristics(id)
         val nivo = when (c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)) {
             CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> "LEGACY"
@@ -86,9 +105,17 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         }
         val mogucnosti = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
         val mapa = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val strana = when (c.get(CameraCharacteristics.LENS_FACING)) {
+            CameraCharacteristics.LENS_FACING_FRONT -> "prednja"
+            CameraCharacteristics.LENS_FACING_BACK -> "zadnja"
+            else -> "spoljna"
+        }
         return Sposobnosti(
             id = id,
             nivo = nivo,
+            strana = strana,
+            rezimi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                NocniRezim.imenaRezima(manager, id) else emptyList(),
             rucnaMoguca = mogucnosti.contains(
                 CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
             ),
@@ -130,6 +157,7 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         val iso: Int = 0,
         val rucnoPrimenjeno: Boolean = false,
         val nocni: Boolean = false,
+        val slozeno: Int = 0,
     )
 
     /** Da li telefon nudi svoj nocni rezim na izabranoj kameri. */
@@ -144,6 +172,12 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
         val id = idKamere() ?: return emptyList()
         return NocniRezim.imenaRezima(manager, id)
     }
+
+    /** Najduza ekspozicija koju izabrana kamera uopste daje, u nanosekundama. */
+    fun najduzaEkspozicija(): Long =
+        sposobnosti()?.ekspozicija?.upper ?: 0L
+
+    fun najveciIso(): Int = sposobnosti()?.iso?.upper ?: 0
 
     fun snimi(): Rezultat {
         val id = idKamere() ?: return Rezultat(null, "nema kamere")
@@ -174,6 +208,25 @@ class Kamera(private val ctx: Context, private val cfg: Config) {
                 )
             }
         }
+        if (cfg.slaganje) {
+            val kadrovi = ArrayList<ByteArray>()
+            var greska = ""
+            repeat(cfg.kadrovaZaSlaganje) {
+                val jedan = obicanSnimak(id, karakteristike)
+                if (jedan.bajtovi != null) kadrovi.add(jedan.bajtovi) else greska = jedan.greska
+            }
+            val spojeno = Slaganje.spoji(kadrovi, cfg.kvalitet)
+            if (spojeno != null) {
+                return Rezultat(
+                    spojeno,
+                    if (kadrovi.size < cfg.kadrovaZaSlaganje)
+                        "složeno ${kadrovi.size} od ${cfg.kadrovaZaSlaganje} kadrova ($greska)" else "",
+                    cfg.ekspozicijaNs * kadrovi.size, cfg.iso, true, slozeno = kadrovi.size,
+                )
+            }
+            return Rezultat(null, greska.ifBlank { "slaganje nije uspelo" })
+        }
+
         return obicanSnimak(id, karakteristike)
     }
 

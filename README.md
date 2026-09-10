@@ -77,20 +77,38 @@ aplikacija se **oglasi**. Tišina znači da sve radi.
 
 ---
 
-## Noćni režim
+## Kako dobiti svetlu sliku u mraku
 
-**Režim → Noćni** koristi ono što telefon već ima. Ne pišemo mi slaganje
-kadrova nego ga tražimo od proizvođača, kroz standardni Camera2 Extensions API.
+Četiri režima, i biraju se tim redom.
 
-Dve posledice koje treba znati:
+**Kamera pre režima.** Telefon ima više kamera i one se razlikuju baš u onome
+što je ovde jedino važno: dokle ide ekspozicija i da li nude noćni režim.
+Kartica **Kamera** ispisuje sve, sa rasponom ekspozicije i oznakom
+`NOĆNI REŽIM` kod onih koje ga imaju. Izmereno na Samsung S23: kamera 0 daje
+najviše **1/6 s** i nema nijedan noćni režim, pa vredi probati ostale.
 
-- **Jedan snimak traje nekoliko sekundi**, pa razmak od jednog minuta nema
-  smisla. Uzmi bar dva.
-- **Ekspoziciju bira telefon i ne može se zaključati.** Zbog toga se merenje
-  pokreta radi tako da promena svetline ne prolazi kao pokret; svakoj sličici
-  se pre poređenja oduzme njena srednja svetlina.
+| režim | šta radi | kada |
+|---|---|---|
+| **Noćni** | noćni režim samog telefona, kroz Camera2 Extensions | kad ga ta kamera nudi; ekran to kaže |
+| **Auto** | automatika, uz zaključavanje posle prve slike | kad u sobi ima nekog svetla |
+| **Ručno** | upisano vreme i ISO | kad kamera daje dovoljno dugu ekspoziciju |
+| **Slaganje** | snimi više kadrova zaredom i sabere ih u jedan | kad ništa od gornjeg ne daje svetlu sliku |
 
-Ako noćni snimak ne uspe, snima se obično, ali to piše u `noc.json` i na ekranu.
+**Slaganje** je odgovor na telefon koji dužu ekspoziciju prosto ne dozvoljava.
+Osam kadrova od 1/6 s sabranih zajedno je isto svetlo kao jedan od 1,3 s, uz
+manje šuma, jer je šum slučajan u svakom kadru a slika ispod njega ista. To je
+i ono što noćni režim radi u proizvođačevom kodu.
+
+Cena: jedna slika traje nekoliko sekundi, izlaz je oko 2 MP, a pokret tokom tih
+par sekundi se razmaže. Za položaj tela ništa od toga ne smeta.
+
+Uz ručne vrednosti postoji dugme **Postavi na granicu telefona**, koje upiše
+najdužu ekspoziciju i najveći ISO koje ta kamera stvarno daje. Bez njega se
+granica traži pogađanjem, jer telefon sve preko nje tiho stegne i ne kaže ništa.
+
+**Zbog svega ovoga merenje pokreta ne broji promenu svetline:** svakoj sličici
+se pre poređenja oduzme njena srednja svetlina, pa noć u kojoj telefon menja
+ekspoziciju ne izgleda nemirno.
 
 ---
 
@@ -144,7 +162,9 @@ u EXIF-u.
 | Razmak | 5 min | 1, 2, 3, 5, 10, 15, 30 ili 60. Slika se na pun minut po satu, ne od trenutka pokretanja |
 | Rezolucija | puna | ekran odmah kaže koliko je to slika i gigabajta po noći |
 | Kamera | zadnja | veći senzor, a ekran gleda od kreveta |
-| Režim | Automatika | **Noćni**, Automatika ili Ručno. Tri odvojena puta |
+| Kamera | auto | tačna kamera po oznaci; razlikuju se u ekspoziciji i noćnom režimu |
+| Režim | Automatika | Noćni, Auto, Ručno ili **Slaganje** |
+| Kadrova za slaganje | 8 | osam kadrova od 1/6 s je kao jedan od 1,3 s |
 | Zaključaj ekspoziciju posle prve slike | uključeno | važi za Automatiku: prva slika određuje vrednosti za celu noć |
 | Prekini kad baterija padne na | 5% | ugašen telefon ne završi zapisnik |
 | Rastojanje do kreveta | 2 m | iz toga se računa fiksni fokus |

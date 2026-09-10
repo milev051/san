@@ -14,8 +14,8 @@ android {
         // direktno u DCIM, pa je 26 najniza granica koja jos ima smisla.
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = 5
+        versionName = "0.5"
     }
 
     buildTypes {

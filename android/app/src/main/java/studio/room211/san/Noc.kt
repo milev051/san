@@ -31,6 +31,7 @@ class Noc(private val ctx: Context, val datum: String) {
         ekspozicijaNs: Long = 0,
         iso: Int = 0,
         nocni: Boolean = false,
+        slozeno: Int = 0,
     ) {
         val koren = ucitaj()
         koren.put("noc", datum)
@@ -49,6 +50,7 @@ class Noc(private val ctx: Context, val datum: String) {
             if (ekspozicijaNs > 0) put("ekspozicija_ns", ekspozicijaNs)
             if (iso > 0) put("iso", iso)
             if (nocni) put("nocni_rezim", true)
+            if (slozeno > 0) put("slozeno_kadrova", slozeno)
             if (greska.isNotBlank()) put("greska", greska)
         })
         koren.put("slike", redovi)

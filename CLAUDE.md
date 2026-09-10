@@ -50,6 +50,18 @@ ekspoziciju za svaki snimak, pa dva kadra iste mirne sobe umeju da budu
 različito svetla. `Pokret.razlikaBezSjaja` svakoj sličici oduzme njenu srednju
 svetlinu pre poređenja; bez toga mirna noć izgleda nemirno.
 
+**Kamere se razlikuju, i izbor mora da postoji.** Izmereno na Samsung S23:
+kamera 0 daje najviše 1/6 s i ne prijavljuje nijedan noćni režim, nego samo
+automatski, lice i bokeh. Zbog toga postoji izbor tačne kamere po oznaci, a ne
+samo prednja/zadnja, i kartica koja za svaku ispisuje raspon ekspozicije i
+proširenja.
+
+**Kad telefon ne da dugu ekspoziciju, slaže se više kadrova.** `Slaganje.spoji`
+sabira, ne uprosečava: prosek osam mračnih kadrova je i dalje mračan, samo mu je
+šum manji. Sabiranje je ono što sliku posvetli, pa se vrednosti seku na 255
+umesto da se dele. Slaže se na 1600px duže strane, jer sabirač za 12 MP ne bi
+stao u memoriju.
+
 **Tražena ekspozicija nije dobijena ekspozicija.** Granica se razlikuje od
 modela do modela; sve iznad nje telefon tiho stegne na svoju vrednost, bez
 greške, pa izgleda kao da podešavanje ne radi. Zato se iz `CaptureResult` čita
@@ -168,6 +180,8 @@ primeti tek kad se dva izlaza ne poklope.
 | Male kopije upisivane u `Documents` posle svake slike | dva albuma istog imena sa istim slikama u galeriji | privatni folder, izvoz na dugme; `Zapis.obrisiIzvoz` čisti staro |
 | `SENSOR_EXPOSURE_TIME` bez čitanja `CaptureResult` | tražena vrednost stegnuta na granicu uređaja, izgleda kao da podešavanje ne radi | pročitaj i prikaži dobijeno pored traženog |
 | `SENSOR_FRAME_DURATION` kraće od ekspozicije | senzor preseca ekspoziciju | veće od dva, uz `SENSOR_INFO_MAX_FRAME_DURATION` |
+| Traženo 1/2 s na kameri koja daje 1/6 s | ista mračna slika za svaku traženu vrednost, bez greške | dugme „Postavi na granicu telefona", pa režim Slaganje |
+| Pretpostavka da noćni režim postoji na glavnoj kameri | na S23 ga kamera 0 nema | izbor kamere po oznaci, uz ispis proširenja za svaku |
 | `strings \| grep -q` uz `pipefail` u `objavi.sh` | `grep` izađe na prvom pogotku, `strings` dobije SIGPIPE, skripta odbije ispravan APK | stringovi u fajl pa `grep -F` nad fajlom |
 
 ---

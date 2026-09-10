@@ -50,6 +50,9 @@ class Podesavanja : AppCompatActivity() {
     private lateinit var probaSlika: ImageView
     private lateinit var brojSlikaOpis: TextView
     private lateinit var rezimOpis: TextView
+    private lateinit var kameraOpis: TextView
+    private var ekspozicijaPolje: com.google.android.material.textfield.TextInputEditText? = null
+    private var isoPolje: com.google.android.material.textfield.TextInputEditText? = null
     private val posao = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +68,7 @@ class Podesavanja : AppCompatActivity() {
         }
         koren.addView(naslov())
         koren.addView(karticaProba())
+        koren.addView(karticaKamera())
         koren.addView(karticaRazmak())
         koren.addView(karticaSlika())
         koren.addView(karticaZvuk())
@@ -129,6 +133,9 @@ class Podesavanja : AppCompatActivity() {
                         if (prosirenja.isEmpty()) "nijedan" else prosirenja.joinToString(", "))
                 opis.append("\nSnimak je trajao ${trajalo / 1000.0}s")
                 if (ishod.nocni) opis.append("\nSnimljeno NOĆNIM režimom telefona")
+                if (ishod.slozeno > 0) {
+                    opis.append("\nSloženo ${ishod.slozeno} kadrova u jednu sliku")
+                }
                 if (ishod.bajtovi != null) {
                     // Uspravno, isto kao što će biti sačuvano. `BitmapFactory`
                     // ne gleda EXIF, pa je slika ovde ranije stajala bočno.
@@ -153,6 +160,12 @@ class Podesavanja : AppCompatActivity() {
      */
     private fun uporediTrazeno(ishod: Kamera.Rezultat): String {
         val redovi = ArrayList<String>()
+        if (ishod.slozeno > 0) {
+            redovi.add("Po kadru: ${Kamera.Sposobnosti.vremeTekst(cfg.ekspozicijaNs)}, ISO ${cfg.iso}")
+            redovi.add("Ukupno: ${Kamera.Sposobnosti.vremeTekst(ishod.ekspozicijaNs)} " +
+                    "kroz ${ishod.slozeno} kadrova")
+            return redovi.joinToString("\n")
+        }
         val trazeno = when {
             cfg.rucnaEkspozicija -> cfg.ekspozicijaNs
             cfg.zakljucanaEkspozicijaNs > 0 -> cfg.zakljucanaEkspozicijaNs
@@ -169,12 +182,65 @@ class Podesavanja : AppCompatActivity() {
                 kotlin.math.abs(ishod.ekspozicijaNs - trazeno) > trazeno / 10
             ) {
                 redovi.add("UPOZORENJE: telefon je traženu ekspoziciju stegao na svoju granicu. " +
-                        "Traži vrednost unutar raspona ispisanog gore.")
+                        "Pritisni „Postavi na granicu telefona\", pa ako je i tada mračno, " +
+                        "izaberi režim Slaganje ili drugu kameru.")
             }
         } else {
             redovi.add("Režim: automatika")
         }
         return redovi.joinToString("\n")
+    }
+
+    // ---------------------------------------------------------------- kamera
+
+    /**
+     * Izbor tačne kamere, ne samo prednja ili zadnja.
+     *
+     * Telefon ima više kamera i one se razlikuju baš u onome što je ovde jedino
+     * važno: dokle ide ekspozicija i da li nude noćni režim. Na S23 kamera 0
+     * daje najviše 1/6 s i nema nijedan noćni režim, pa se druge moraju
+     * isprobati.
+     */
+    private fun karticaKamera(): ViewGroup {
+        val (kartica, sadrzaj) = card(this, "Kamera")
+        val sve = try { Kamera(this, cfg).sveKamere() } catch (e: Exception) { emptyList() }
+
+        if (sve.isEmpty()) {
+            sadrzaj.addView(body(this, "Kamere se ne mogu pročitati."))
+            kameraOpis = body(this, "")
+            sadrzaj.addView(kameraOpis)
+            return kartica
+        }
+
+        sadrzaj.addView(choice(
+            this,
+            listOf("" to "auto") + sve.map { it.id to "${it.id} ${it.strana.take(4)}" },
+            cfg.kameraId,
+        ) { izbor ->
+            cfg.kameraId = izbor
+            kameraOpis.text = opisKamera(sve)
+            osveziRezim()
+        })
+
+        kameraOpis = body(this, opisKamera(sve))
+        sadrzaj.addView(kameraOpis)
+        return kartica
+    }
+
+    private fun opisKamera(sve: List<Kamera.Sposobnosti>): String {
+        val izabrana = cfg.kameraId
+        return sve.joinToString("\n\n") { k ->
+            val oznaka = if (k.id == izabrana) "► " else "  "
+            val nocni = if (k.rezimi.contains("noćni")) "NOĆNI REŽIM" else "bez noćnog"
+            val eksp = k.ekspozicija
+            val raspon = if (eksp == null) "?" else
+                "do ${Kamera.Sposobnosti.vremeTekst(eksp.upper)}"
+            val najveca = k.velicine.firstOrNull()
+            "$oznaka${k.id} ${k.strana}, ${k.nivo}\n" +
+                    "   ekspozicija $raspon, ISO do ${k.iso?.upper ?: "?"}\n" +
+                    "   ${najveca?.width ?: 0}x${najveca?.height ?: 0}, $nocni"
+        } + "\n\nTraži kameru koja ima noćni režim ili dužu ekspoziciju. Ako je nijedna nema, " +
+                "koristi Slaganje."
     }
 
     // ---------------------------------------------------------------- razmak
@@ -235,7 +301,7 @@ class Podesavanja : AppCompatActivity() {
         sadrzaj.addView(body(this, "Kako se snima. Tri odvojena puta, ne prekidači koji se sabiraju."))
         sadrzaj.addView(choice(
             this,
-            listOf("noc" to "Noćni", "auto" to "Automatika", "rucno" to "Ručno"),
+            listOf("noc" to "Noćni", "auto" to "Auto", "rucno" to "Ručno", "slaganje" to "Slaganje"),
             cfg.rezim,
         ) { cfg.rezim = it; osveziRezim() })
 
@@ -248,11 +314,31 @@ class Podesavanja : AppCompatActivity() {
                 "pročita koju je ekspoziciju i ISO telefon stvarno upotrebio, i ostatak noći ide " +
                 "tim vrednostima, pa su sve slike uporedive."))
 
-        sadrzaj.addView(field(this, "Ekspozicija, 1/x sekunde", ekspozicijaTekst()) { uneto ->
+        val eksp = field(this, "Ekspozicija, 1/x sekunde", ekspozicijaTekst()) { uneto ->
             uneto.toIntOrNull()?.let { if (it > 0) cfg.ekspozicijaNs = 1_000_000_000L / it }
-        }.first)
-        sadrzaj.addView(field(this, "ISO", cfg.iso.toString()) { uneto ->
+        }
+        ekspozicijaPolje = eksp.second
+        sadrzaj.addView(eksp.first)
+        val isoP = field(this, "ISO", cfg.iso.toString()) { uneto ->
             uneto.toIntOrNull()?.let { cfg.iso = it }
+        }
+        isoPolje = isoP.second
+        sadrzaj.addView(isoP.first)
+
+        // Bez ovoga se granica telefona traži pogađanjem: sve preko nje daje
+        // istu sliku, jer je telefon tiho stegne i ne kaže ništa.
+        sadrzaj.addView(button(this, "Postavi na granicu telefona") {
+            val kamera = Kamera(this, cfg)
+            val najduza = kamera.najduzaEkspozicija()
+            val najveci = kamera.najveciIso()
+            if (najduza > 0) cfg.ekspozicijaNs = najduza
+            if (najveci > 0) cfg.iso = najveci
+            ekspozicijaPolje?.setText(ekspozicijaTekst())
+            isoPolje?.setText(cfg.iso.toString())
+        })
+
+        sadrzaj.addView(field(this, "Kadrova za slaganje", cfg.kadrovaZaSlaganje.toString()) { uneto ->
+            uneto.toIntOrNull()?.let { cfg.kadrovaZaSlaganje = it }
         }.first)
         sadrzaj.addView(field(this, "Rastojanje do kreveta, u metrima", cfg.rastojanjeM.toString()) { uneto ->
             uneto.toFloatOrNull()?.let { cfg.rastojanjeM = it }
@@ -279,6 +365,20 @@ class Podesavanja : AppCompatActivity() {
             } else {
                 "UPOZORENJE: ovaj telefon ne prijavljuje noćni režim na izabranoj kameri. " +
                         "Snimaće se obično. Probaj drugu kameru ili izaberi Automatiku."
+            }
+            "slaganje" -> {
+                val kamera = Kamera(this, cfg)
+                val najduza = kamera.najduzaEkspozicija()
+                "Duga ekspozicija sabiranjem više kadrova, kad telefon dužu ne dozvoljava. " +
+                        "Snimi se ${cfg.kadrovaZaSlaganje} kadrova zaredom i saberu se u jedan, pa je " +
+                        "slika ${Slaganje.dobitak(cfg.kadrovaZaSlaganje)} i sa manje šuma.\n" +
+                        (if (najduza > 0) "Ova kamera daje najviše " +
+                                "${Kamera.Sposobnosti.vremeTekst(najduza)} po kadru, što uz " +
+                                "${cfg.kadrovaZaSlaganje} kadrova daje oko " +
+                                "${Kamera.Sposobnosti.vremeTekst(najduza * cfg.kadrovaZaSlaganje)} " +
+                                "ukupne ekspozicije.\n" else "") +
+                        "Traje nekoliko sekundi po slici, izlaz je oko 2 MP, a pokret tokom " +
+                        "snimanja se razmaže. Za položaj tela to ne smeta."
             }
             "rucno" -> "Upisane vrednosti ispod. Ako ih telefon ne prihvati, Noćna proba to kaže: " +
                     "ispisuje i traženo i dobijeno."

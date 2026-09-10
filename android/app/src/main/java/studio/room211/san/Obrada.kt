@@ -28,6 +28,7 @@ object Obrada {
         val rucnoPrimenjeno: Boolean = false,
         val uri: String = "",
         val nocni: Boolean = false,
+        val slozeno: Int = 0,
     )
 
     /** Folder sa malim kopijama jedne noci, unutar aplikacije. */
@@ -90,7 +91,8 @@ object Obrada {
 
         return Ishod(
             ime, pokret, snimak.greska,
-            snimak.ekspozicijaNs, snimak.iso, snimak.rucnoPrimenjeno, uri.toString(), snimak.nocni,
+            snimak.ekspozicijaNs, snimak.iso, snimak.rucnoPrimenjeno, uri.toString(),
+            snimak.nocni, snimak.slozeno,
         )
     }
 

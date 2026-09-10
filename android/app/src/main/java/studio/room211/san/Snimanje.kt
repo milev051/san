@@ -182,7 +182,7 @@ class Snimanje : Service() {
             zapisnik.dodaj(
                 vreme, ishod.ime, ishod.pokret, cfg.razmakMin, greska = ishod.greska,
                 uri = ishod.uri, ekspozicijaNs = ishod.ekspozicijaNs, iso = ishod.iso,
-                nocni = ishod.nocni,
+                nocni = ishod.nocni, slozeno = ishod.slozeno,
             )
 
             // Zakljucavanje posle prve slike: automatika jednom odredi

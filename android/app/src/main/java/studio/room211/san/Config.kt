@@ -39,6 +39,28 @@ class Config(context: Context) {
         get() = prefs.getBoolean("prednja", false)
         set(v) = prefs.edit().putBoolean("prednja", v).apply()
 
+    /**
+     * Tacna kamera po oznaci, prazno znaci „izaberi po strani".
+     *
+     * Telefon ima vise kamera i one se razlikuju u onome sto je ovde jedino
+     * vazno: dokle ide ekspozicija i da li uopste nude nocni rezim. Na S23 je
+     * kamera 0 dala najvise 1/6 s i nijedan nocni rezim, pa izbor mora da
+     * postoji.
+     */
+    var kameraId: String
+        get() = prefs.getString("kamera_id", "")!!
+        set(v) = prefs.edit().putString("kamera_id", v).apply()
+
+    /**
+     * Koliko kadrova se sabira u rezimu `slaganje`.
+     *
+     * Osam kadrova od 1/6 s je isto svetlo kao jedan od 1.3 s, sto je jedini
+     * nacin da se dobije duga ekspozicija na telefonu koji je ne dozvoljava.
+     */
+    var kadrovaZaSlaganje: Int
+        get() = prefs.getInt("kadrova", 8)
+        set(v) = prefs.edit().putInt("kadrova", v.coerceIn(2, 24)).apply()
+
     /** `puna`, `8mp` ili `2mp`. */
     var rezolucija: String
         get() = prefs.getString("rezolucija", "puna")!!
@@ -64,10 +86,13 @@ class Config(context: Context) {
         set(v) = prefs.edit().putString("rezim", v).apply()
 
     val rucnaEkspozicija: Boolean
-        get() = rezim == "rucno"
+        get() = rezim == "rucno" || rezim == "slaganje"
 
     val nocniRezim: Boolean
         get() = rezim == "noc"
+
+    val slaganje: Boolean
+        get() = rezim == "slaganje"
 
     /** Vreme ekspozicije u nanosekundama. Granicu odredjuje telefon, ne mi. */
     var ekspozicijaNs: Long
